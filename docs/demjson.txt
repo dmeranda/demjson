@@ -404,7 +404,7 @@ CLASSES
      |  ----------------------------------------------------------------------
      |  Data and other attributes inherited from exceptions.ValueError:
      |  
-     |  __new__ = <built-in method __new__ of type object at 0x36d5b79f20>
+     |  __new__ = <built-in method __new__ of type object>
      |      T.__new__(S, ...) -> a new object with type S, a subtype of T
      |  
      |  ----------------------------------------------------------------------
@@ -479,7 +479,7 @@ CLASSES
      |  ----------------------------------------------------------------------
      |  Data and other attributes inherited from exceptions.ValueError:
      |  
-     |  __new__ = <built-in method __new__ of type object at 0x36d5b79f20>
+     |  __new__ = <built-in method __new__ of type object>
      |      T.__new__(S, ...) -> a new object with type S, a subtype of T
      |  
      |  ----------------------------------------------------------------------
@@ -553,7 +553,7 @@ CLASSES
      |  ----------------------------------------------------------------------
      |  Data and other attributes inherited from exceptions.ValueError:
      |  
-     |  __new__ = <built-in method __new__ of type object at 0x36d5b79f20>
+     |  __new__ = <built-in method __new__ of type object>
      |      T.__new__(S, ...) -> a new object with type S, a subtype of T
      |  
      |  ----------------------------------------------------------------------
@@ -720,13 +720,13 @@ FUNCTIONS
 
 DATA
     __author__ = 'Deron Meranda <http://deron.meranda.us/>'
-    __credits__ = 'Copyright (c) 2006-2010 Deron E. Meranda <http:/.../lic...
-    __date__ = '2010-10-10'
-    __version__ = '1.5'
+    __credits__ = 'Copyright (c) 2006-2011 Deron E. Meranda <http:/.../lic...
+    __date__ = '2011-04-01'
+    __version__ = '1.6'
     content_type = 'application/json'
     file_ext = 'json'
     float_maxexp = 307
-    float_sigdigits = 15
+    float_sigdigits = 14
     hexdigits = '0123456789ABCDEFabcdef'
     i = 31
     inf = inf
@@ -737,18 +737,19 @@ DATA
     unsafe_string_chars = '"\\\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b...
 
 VERSION
-    1.5
+    1.6
 
 DATE
-    2010-10-10
+    2011-04-01
 
 AUTHOR
     Deron Meranda <http://deron.meranda.us/>
 
 CREDITS
-    Copyright (c) 2006-2010 Deron E. Meranda <http://deron.meranda.us/>
-    Licensed under GNU LGPL 3.0 (GNU Lesser General Public License) or
-    later.  See LICENSE.txt included with this software.
+    Copyright (c) 2006-2011 Deron E. Meranda <http://deron.meranda.us/>
+    
+    Licensed under GNU LGPL (GNU Lesser General Public License) version 3.0
+    or later.  See LICENSE.txt included with this software.
     
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Lesser General Public License as

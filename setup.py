@@ -1,7 +1,7 @@
 # -*- python -*-
 from distutils.core import setup
 name = 'demjson'
-version = '1.5'
+version = '1.6'
 setup( name=name,
        version=version,
        py_modules=[name],

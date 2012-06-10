@@ -3,12 +3,19 @@ a wonderful language.  Thanks also to the folks at json.org for
 developing the JSON data format and pursuing an RFC standard for it.
 
 Reported bugs:
+
   * Adam Braun -- reported bug in 1.0 release regarding newlines being
         rejected during decoding if at the beginning of the input.
+
   * Nicolas Bonardelle -- reported bug in 1.1 release where the wrong
         kind of exception could be raised by encode_default().
+
   * Tom Kho and Yanxin Shi -- independently reported bug in the 1.4
         release, that when encoding Python strings to JSON, occurances
         of character U+00FF (ASCII 255 or 0xFF) may result in an
         error.
+
+  * Brian Bloniarz -- reported a bug in 1.5 for the jsonlint
+        command where it could not properly accept and parse from
+        standard input (stdin).
 

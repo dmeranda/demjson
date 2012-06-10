@@ -12,7 +12,7 @@ See INSTALL.txt for mo detailed instructions.
 
 In addition to the module "demjson", there is also an included script
 "jsonlint" which is meant to be used as a command-line tool.  You can
-invoke "jsonlint --help" for its usage isntructions.
+invoke "jsonlint --help" for its usage instructions.
 
 
 The module is self-documented, so within the python interpreter type:

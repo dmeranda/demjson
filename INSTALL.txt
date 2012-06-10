@@ -1,9 +1,12 @@
 == Basic installation
 
-This software is published in the Python Package Index (PYPI), formerly
-known as the Python Cheeseshop.  If you have the setuptools installed,
-you may be able to install this module with just:
+This software is published in the Python Package Index (PYPI),
+at <http://pypi.python.org/>, which may make it easy to install.
+If your system has either "pip" or "easy_install", then you may
+try one of the following commands to install this module:
 
+   pip install demjson
+   pip-python install demjson
    easy_install demjson
 
 Otherwise, you can install it by downloading the distrubtion and

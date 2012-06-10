@@ -1,29 +1,31 @@
 #!/usr/bin/env python
-# -*- coding: utf8 -*-
+# -*- coding: utf-8 -*-
 r"""A JSON syntax validator and formatter tool.
 
 Requires demjson module.
 
 """
 __author__ = "Deron Meranda <http://deron.meranda.us/>"
-__date__ = "2008-12-17"
-__version__ = "1.4"
-__credits__ = """Copyright (c) 2006-2008 Deron E. Meranda <http://deron.meranda.us/>
-Licensed under GNU LGPL (GNU Lesser General Public License) version
-3.0 or later.  See LICENSE.txt included with this software.
+__date__ = "2011-04-01"
+__version__ = "1.6"
+__credits__ = """Copyright (c) 2006-2011 Deron E. Meranda <http://deron.meranda.us/>
+
+Licensed under GNU LGPL (GNU Lesser General Public License) version 3.0
+or later.  See LICENSE.txt included with this software.
 
 This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+it under the terms of the GNU Lesser General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+You should have received a copy of the GNU Lesser General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>
+or <http://www.fsf.org/licensing/>.
 
 """
 
@@ -81,15 +83,17 @@ def lintcheck( filename, verbose=False, strict=True, reformat=False, input_encod
 
 main_usage = """Usage: jsonlint [-v] [-s|-S] [-f|-F] [-e codec] inputfile.json ...
 
-The return status will be 0 if the file is legal JSON, or
-non-zero otherwise.  Use -v to see the warning details.
+There is NO OUTPUT by default. Use -v to see any warning details.
+
+The return status will be 0 if the file is conforming JSON (per the
+RFC 4627 specification), or non-zero otherwise.
 
 Options are:
  -v | --verbose    Show details of lint checking
- -s | --strict     Be strict in what is considered legal JSON (the default)
- -S | --nonstrict  Be loose in what is considered legal JSON
+ -s | --strict     Be strict in what is considered conforming JSON (the default)
+ -S | --nonstrict  Be loose in what is considered conforming JSON
 
- -f | --format     Reformat the JSON (if legal) to stdout
+ -f | --format     Reformat the JSON text (if conforming) to stdout
  -F | --format-compactly
         Reformat the JSON simlar to -f, but do so compactly by
         removing all unnecessary whitespace
@@ -111,6 +115,9 @@ will be output as literal characters if the encoding permits,
 otherwise they will be \u-escaped.  You can use "-e ascii" to force
 all Unicode characters to be escaped.
 
+Use 'jsonlint --version' to see versioning information.
+Use 'jsonlint --copyright' to see author and copyright details.'
+
 """
 
 def main( args ):
@@ -130,13 +137,22 @@ def main( args ):
                                      'format','format-compactly',
                                      'strict','nonstrict',
                                      'encoding=',
-                                     'input-encoding=','output-encoding=','help'] )
+                                     'input-encoding=','output-encoding=',
+                                     'help','version','copyright'] )
     except getopt.GetoptError:
         sys.stderr.write( main_usage )
         return 1
     for opt, val in opts:
         if opt in ('-h', '--help'):
             sys.stdout.write( main_usage )
+            return 0
+        elif opt == '--version':
+            sys.stdout.write( 'jsonlint version %s (%s)\n' % (__version__, __date__) )
+            sys.stdout.write( 'demjson version %s (%s)\n' % (demjson.__version__, demjson.__date__)  )
+            return 0
+        elif opt == '--copyright':
+            sys.stdout.write( 'jsonlint is distributed as part of the "demjson" python package.\n\n' )
+            sys.stdout.write( __credits__ )
             return 0
         elif opt in ('-v', '--verbose'):
             verbose = True
@@ -172,7 +188,11 @@ def main( args ):
     else:
         jsondata = sys.stdin.read()
         if not lintcheck_data( jsondata, verbose=verbose, reformat=reformat,
-                               encoding=encoding, escape_unicode=escape_unicode, pfx='<stdin>: ' ):
+                               strict=strict,
+                               input_encoding=input_encoding,
+                               output_encoding=output_encoding,
+                               escape_unicode=escape_unicode,
+                               pfx='<stdin>: ' ):
             success = False
 
     if not success:

@@ -1,5 +1,15 @@
 Change history for demjson python module.
 
+Version 1.6 released 2011-04-01
+
+ * Bug fix. The jsonlint tool failed to accept a JSON document from
+   standard input (stdin).  Also added a --version and --copyright
+   option support to jsonlint.  Thanks to Brian Bloniarz for reporting
+   this bug.
+
+ * No changes to the core demjson library/module was made, other
+   than a version number bump.
+
 Version 1.5 released 2010-10-10
 
  * Bug fix. When encoding Python strings to JSON, occurances of

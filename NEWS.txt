@@ -1,6 +1,8 @@
 News announcements regarding the demjson python module.
 See the file CHANGES.txt for more details.
 
+2011-04-01  Release 1.6, bug fix in jsonlint
+2010-10-10  Release 1.5, bug fix with code point U+00FF
 2008-12-17  Release 1.4, license changed to LGPL 3 (no code changes).
 2008-03-19  Release 1.3, bug fixes, numeric improvements, Decimal, more collections types.
 2007-11-08  Release 1.2, bug fixes, speed improvements, jsonlint, license now GPL 3.
