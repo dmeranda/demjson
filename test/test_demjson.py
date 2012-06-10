@@ -233,9 +233,9 @@ class DemjsonTest(unittest.TestCase):
     def testEncodeSupplementalUnicode(self):
         import sys
         if sys.maxunicode > 65535:
-            self.assertEqual(demjson.encode(u'\U00010000'), r'"\ud800\udc00"')
-            self.assertEqual(demjson.encode(u'\U00102345'), r'"\udbc8\udf45"')
-            self.assertEqual(demjson.encode(u'\U0010ffff'), r'"\udbff\udfff"')
+            self.assertEqual(demjson.encode(u'\U00010000',encoding='ascii'), r'"\ud800\udc00"')
+            self.assertEqual(demjson.encode(u'\U00102345',encoding='ascii'), r'"\udbc8\udf45"')
+            self.assertEqual(demjson.encode(u'\U0010ffff',encoding='ascii'), r'"\udbff\udfff"')
 
     def testDecodeArraySimple(self):
         self.assertEqual(demjson.decode('[]'), [])

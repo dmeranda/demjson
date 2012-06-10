@@ -144,7 +144,7 @@ CLASSES
      |  
      |  Methods defined here:
      |  
-     |  __init__(self, strict=False, compactly=True, escape_unicode=True)
+     |  __init__(self, strict=False, compactly=True, escape_unicode=False)
      |      Creates a JSON encoder/decoder object.
      |      
      |      If 'strict' is set to True, then only strictly-conforming JSON
@@ -190,6 +190,13 @@ CLASSES
      |      
      |      Takes text and a starting index, and returns either a Python list or
      |      dictionary and the index of the next unparsed character.
+     |  
+     |  decode_javascript_identifier(self, name)
+     |      Convert a JavaScript identifier into a Python string object.
+     |      
+     |      This method can be overriden by a subclass to redefine how JavaScript
+     |      identifiers are turned into Python objects.  By default this just
+     |      converts them into strings.
      |  
      |  decode_null(self, s, i=0)
      |      Intermediate-level decoder for ECMAScript 'null' keyword.
@@ -450,13 +457,137 @@ CLASSES
      |  
      |  __str__(...)
 
+FUNCTIONS
+    auto_unicode_decode(s)
+        Takes a string and tries to convert it to a Unicode string.
+        
+        This will return a Python unicode string type corresponding to the
+        input string (either str or unicode).  The character encoding is
+        guessed by looking for either a Unicode BOM prefix, or by the
+        rules specified by RFC 4627.  When in doubt it is assumed the
+        input is encoded in UTF-8 (the default for JSON).
+    
+    decode(txt, strict=False, encoding=None, **kw)
+        Decodes a JSON-encoded string into a Python object.
+        
+        If 'strict' is set to True, then those strings that are not
+        entirely strictly conforming to JSON will result in a
+        JSONDecodeError exception.
+        
+        The input string can be either a python string or a python unicode
+        string.  If it is already a unicode string, then it is assumed
+        that no character set decoding is required.
+        
+        However, if you pass in a non-Unicode text string (i.e., a python
+        type 'str') then an attempt will be made to auto-detect and decode
+        the character encoding.  This will be successful if the input was
+        encoded in any of UTF-8, UTF-16 (BE or LE), or UTF-32 (BE or LE),
+        and of course plain ASCII works too.
+        
+        Note though that if you know the character encoding, then you
+        should convert to a unicode string yourself, or pass it the name
+        of the 'encoding' to avoid the guessing made by the auto
+        detection, as with
+        
+            python_object = demjson.decode( input_bytes, encoding='utf8' )
+        
+        Optional keywords arguments must be of the form
+            allow_xxxx=True/False
+        or
+            prevent_xxxx=True/False
+        where each will allow or prevent the specific behavior, after the
+        evaluation of the 'strict' argument.  For example, if strict=True
+        then by also passing 'allow_comments=True' then comments will be
+        allowed.  If strict=False then prevent_comments=True will allow
+        everything except comments.
+    
+    decode_hex(hexstring)
+        Decodes a hexadecimal string into it's integer value.
+    
+    decode_octal(octalstring)
+        Decodes an octal string into it's integer value.
+    
+    determine_float_precision()
+        Returns a tuple (significant_digits, max_exponent) for the float type.
+    
+    encode(obj, strict=False, compactly=True, escape_unicode=False, encoding=None)
+        Encodes a Python object into a JSON-encoded string.
+        
+        If 'strict' is set to True, then only strictly-conforming JSON
+        output will be produced.  Note that this means that some types
+        of values may not be convertable and will result in a
+        JSONEncodeError exception.
+        
+        If 'compactly' is set to True, then the resulting string will
+        have all extraneous white space removed; if False then the
+        string will be "pretty printed" with whitespace and indentation
+        added to make it more readable.
+        
+        If 'escape_unicode' is set to True, then all non-ASCII characters
+        will be represented as a unicode escape sequence; if False then
+        the actual real unicode character will be inserted.
+        
+        If no encoding is specified (encoding=None) then the output will
+        either be a Python string (if entirely ASCII) or a Python unicode
+        string type.
+        
+        However if an encoding name is given then the returned value will
+        be a python string which is the byte sequence encoding the JSON
+        value.  As the default/recommended encoding for JSON is UTF-8,
+        you should almost always pass in encoding='utf8'.
+    
+    extend_and_flatten_list_with_sep(orig_seq, extension_seq, separator='')
+    
+    extend_list_with_sep(orig_seq, extension_seq, sepchar='')
+    
+    isnumbertype(obj)
+        Is the object of a Python number type (excluding complex)?
+    
+    isstringtype(obj)
+        Is the object of a Python string type?
+    
+    skipstringsafe(s, start=0, end=None)
+    
+    skipstringsafe_slow(s, start=0, end=None)
+    
+    surrogate_pair_as_unicode(c1, c2)
+        Takes a pair of unicode surrogates and returns the equivalent unicode character.
+        
+        The input pair must be a surrogate pair, with c1 in the range
+        U+D800 to U+DBFF and c2 in the range U+DC00 to U+DFFF.
+    
+    unicode_as_surrogate_pair(c)
+        Takes a single unicode character and returns a sequence of surrogate pairs.
+        
+        The output of this function is a tuple consisting of one or two unicode
+        characters, such that if the input character is outside the BMP range
+        then the output is a two-character surrogate pair representing that character.
+        
+        If the input character is inside the BMP then the output tuple will have
+        just a single character...the same one.
+    
+    utf32be_decode(obj, errors='strict')
+        Decodes a UTF-32BE byte string into a Unicode string.
+    
+    utf32be_encode(obj, errors='strict')
+        Encodes a Unicode string into a UTF-32BE encoded byte string.
+    
+    utf32le_decode(obj, errors='strict')
+        Decodes a UTF-32LE byte string into a Unicode string.
+    
+    utf32le_encode(obj, errors='strict')
+        Encodes a Unicode string into a UTF-32LE encoded byte string.
+
 DATA
     __author__ = 'Deron Meranda <http://deron.meranda.us/>'
-    __credits__ = 'Copyright (c) 2006-2007 Deron E. Meranda <http:/...m.  ...
-    __date__ = '2007-11-08'
-    __version__ = '1.2'
+    __credits__ = 'Copyright (c) 2006-2008 Deron E. Meranda <http:/...m.  ...
+    __date__ = '2008-03-19'
+    __version__ = '1.3'
     content_type = 'application/json'
+    decimal = None
     file_ext = 'json'
+    float_maxexp = 307
+    float_sigdigits = 15
     hexdigits = '0123456789ABCDEFabcdef'
     i = 31
     inf = inf
@@ -467,16 +598,16 @@ DATA
     unsafe_string_chars = '"\\\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b...
 
 VERSION
-    1.2
+    1.3
 
 DATE
-    2007-11-08
+    2008-03-19
 
 AUTHOR
     Deron Meranda <http://deron.meranda.us/>
 
 CREDITS
-    Copyright (c) 2006-2007 Deron E. Meranda <http://deron.meranda.us/>
+    Copyright (c) 2006-2008 Deron E. Meranda <http://deron.meranda.us/>
     Licensed under GNU GPL 3.0 or later.  See LICENSE.txt included with this software.
     
     This program is free software: you can redistribute it and/or modify

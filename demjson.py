@@ -114,9 +114,9 @@ r""" A JSON data encoder and decoder.
 """
 
 __author__ = "Deron Meranda <http://deron.meranda.us/>"
-__date__ = "2007-11-08"
-__version__ = "1.2"
-__credits__ = """Copyright (c) 2006-2007 Deron E. Meranda <http://deron.meranda.us/>
+__date__ = "2008-03-19"
+__version__ = "1.3"
+__credits__ = """Copyright (c) 2006-2008 Deron E. Meranda <http://deron.meranda.us/>
 Licensed under GNU GPL 3.0 or later.  See LICENSE.txt included with this software.
 
 This program is free software: you can redistribute it and/or modify
@@ -142,6 +142,59 @@ file_ext = 'json'
 hexdigits = '0123456789ABCDEFabcdef'
 octaldigits = '01234567'
 
+# ----------------------------------------------------------------------
+# Decimal and float types.
+#
+# If a JSON number can not be stored in a Python float without loosing
+# precision and the Python has the decimal type, then we will try to
+# use decimal instead of float.  To make this determination we need to
+# know the limits of the float type, but Python doesn't have an easy
+# way to tell what the largest floating-point number it supports.  So,
+# we detemine the precision and scale of the float type by testing it.
+
+try:
+    # decimal module was introduced in Python 2.4
+    import decimal
+except ImportError:
+    decimal = None
+
+def determine_float_precision():
+    """Returns a tuple (significant_digits, max_exponent) for the float type.
+    """
+    import math
+    # Just count the digits in pi.  The last two decimal digits
+    # may only be partial digits, so discount for them.
+    whole, frac = repr(math.pi).split('.')
+    sigdigits = len(whole) + len(frac) - 2
+
+    # This is a simple binary search.  We find the largest exponent
+    # that the float() type can handle without going infinite or
+    # raising errors.
+    maxexp = None
+    minv = 0; maxv = 1000
+    while True:
+        if minv+1 == maxv:
+            maxexp = minv - 1
+            break
+        elif maxv < minv:
+            maxexp = None
+            break
+        m = (minv + maxv) // 2
+        try:
+            f = repr(float( '1e+%d' % m ))
+        except ValueError:
+            f = None
+        else:
+            if not f or f[0] < '0' or f[0] > '9':
+                f = None
+        if not f:
+            # infinite
+            maxv = m
+        else:
+            minv = m
+    return sigdigits, maxexp
+
+float_sigdigits, float_maxexp = determine_float_precision()
 
 # ----------------------------------------------------------------------
 # The undefined value.
@@ -206,7 +259,7 @@ def _nonnumber_float_constants():
                 # Next, try binary unpacking.  Should work under
                 # platforms using IEEE 754 floating point.
                 import struct, sys
-                xnan = '7ff8000000000000'.decode('hex')
+                xnan = '7ff8000000000000'.decode('hex')  # Quiet NaN
                 xinf = '7ff0000000000000'.decode('hex')
                 xcheck = 'bdc145651592979d'.decode('hex') # -3.14159e-11
                 # Could use float.__getformat__, but it is a new python feature,
@@ -222,7 +275,7 @@ def _nonnumber_float_constants():
                 neginf = - inf
                 if check != -3.14159e-11:
                     raise ValueError('Unpacking raw IEEE 754 floats does not work')
-            except ValueError:
+            except (ValueError, TypeError):
                 # Punt, make some fake classes to simulate.  These are
                 # not perfect though.  For instance nan * 1.0 == nan,
                 # as expected, but 1.0 * nan == 0.0, which is wrong.
@@ -254,7 +307,10 @@ def _nonnumber_float_constants():
                     def __ge__(self,x): return False
                     def __gt__(self,x): return False
                     def __complex__(self,*a): raise NotImplementedError('NaN can not be converted to a complex')
-                nan = nan()
+                if decimal:
+                    nan = decimal.Decimal('NaN')
+                else:
+                    nan = nan()
                 class inf(float):
                     """An approximation of the +Infinity floating point number."""
                     def __repr__(self): return 'inf'
@@ -336,7 +392,10 @@ def _nonnumber_float_constants():
                     def __ge__(self,x): return True
                     def __gt__(self,x): return True
                     def __complex__(self,*a): raise NotImplementedError('Infinity can not be converted to a complex')
-                inf = inf()
+                if decimal:
+                    inf = decimal.Decimal('Infinity')
+                else:
+                    inf = inf()
                 class neginf(float):
                     """An approximation of the -Infinity floating point number."""
                     def __repr__(self): return '-inf'
@@ -415,7 +474,10 @@ def _nonnumber_float_constants():
                             return False
                     def __gt__(self,x): return False
                     def __complex__(self,*a): raise NotImplementedError('-Infinity can not be converted to a complex')
-                neginf = neginf(0)
+                if decimal:
+                    neginf = decimal.Decimal('-Infinity')
+                else:
+                    neginf = neginf(0)
     return nan, inf, neginf
 
 nan, inf, neginf = _nonnumber_float_constants()
@@ -798,7 +860,7 @@ class JSON(object):
                     '"': '\\"',
                     '\\': '\\\\'}
 
-    def __init__(self, strict=False, compactly=True, escape_unicode=True):
+    def __init__(self, strict=False, compactly=True, escape_unicode=False):
         """Creates a JSON encoder/decoder object.
         
         If 'strict' is set to True, then only strictly-conforming JSON
@@ -1057,45 +1119,100 @@ class JSON(object):
             else:
                 raise JSONDecodeError('hexadecimal literals are not allowed in strict JSON',s[i:])
         else:
-            # Decimal (or octal) number, find end of number
+            # Decimal (or octal) number, find end of number.
+            # General syntax is:  \d+[\.\d+][e[+-]?\d+]
             k = j   # will point to end of digit sequence
-            could_be_octal = ( k+1 < imax and s[k] == '0' )
+            could_be_octal = ( k+1 < imax and s[k] == '0' )  # first digit is 0
+            decpt = None  # index into number of the decimal point, if any
+            ept = None # index into number of the e|E exponent start, if any
+            esign = '+' # sign of exponent
+            sigdigits = 0 # number of significant digits (approx, counts end zeros)
             while k < imax and (s[k].isdigit() or s[k] in '.+-eE'):
-                if s[k] not in octaldigits:
+                c = s[k]
+                if c not in octaldigits:
                     could_be_octal = False
+                if c == '.':
+                    if decpt is not None or ept is not None:
+                        break
+                    else:
+                        decpt = k-j
+                elif c in 'eE':
+                    if ept is not None:
+                        break
+                    else:
+                        ept = k-j
+                elif c in '+-':
+                    if not ept:
+                        break
+                    esign = c
+                else: #digit
+                    if not ept:
+                        sigdigits += 1
                 k += 1
-            decimal = s[j:k]
+            number = s[j:k]  # The entire number as a string
+            #print 'NUMBER IS: ', repr(number), ', sign', sign, ', esign', esign, \
+            #      ', sigdigits', sigdigits, \
+            #      ', decpt', decpt, ', ept', ept
 
             # Handle octal integers first as an exception.  If octal
             # is not enabled (the ECMAScipt standard) then just do
             # nothing and treat the string as a decimal number.
             if could_be_octal and self._allow_octal_numbers:
-                n = sign * decode_octal( decimal )
+                n = sign * decode_octal( number )
                 return n, k
 
-            # A decimal number.  Do a quick check on JSON syntax
-            # restrictions.
-            if decimal[0] == '.' and not self._allow_initial_decimal_point:
+            # A decimal number.  Do a quick check on JSON syntax restrictions.
+            if number[0] == '.' and not self._allow_initial_decimal_point:
                 raise JSONDecodeError('numbers in strict JSON must have at least one digit before the decimal point',s[i:])
-            elif decimal[0] == '0' and \
-                     len(decimal) > 1 and decimal[1].isdigit():
+            elif number[0] == '0' and \
+                     len(number) > 1 and number[1].isdigit():
                 if self._allow_octal_numbers:
                     raise JSONDecodeError('initial zero digit is only allowed for octal integers',s[i:])
                 else:
                     raise JSONDecodeError('initial zero digit must not be followed by other digits (octal numbers are not permitted)',s[i:])
-            frac = decimal.find('.')
-            if frac >= 0:
-                if frac+1 >= len(decimal) or not decimal[frac+1].isdigit():
+            # Make sure decimal point is followed by a digit
+            if decpt is not None:
+                if decpt+1 >= len(number) or not number[decpt+1].isdigit():
                     raise JSONDecodeError('decimal point must be followed by at least one digit',s[i:])
-            # Now convert to a number value
-            try:
-                n = int(decimal) * sign
+            # Determine the exponential part
+            if ept is not None:
+                if ept+1 >= len(number):
+                    raise JSONDecodeError('exponent in number is truncated',s[i:])
+                try:
+                    exponent = int(number[ept+1:])
+                except ValueError:
+                    raise JSONDecodeError('not a valid exponent in number',s[i:])
+                ##print 'EXPONENT', exponent
+            else:
+                exponent = 0
+            # Try to make an int/long first.
+            if decpt is None and exponent >= 0:
+                # An integer
+                if ept:
+                    n = int(number[:ept])
+                else:
+                    n = int(number)
+                n *= sign
+                if exponent:
+                    n *= 10**exponent
                 if n == 0 and sign < 0:
                     # minus zero, must preserve negative sign so make a float
                     n = -0.0
-            except ValueError:
+            else:
                 try:
-                    n = float(decimal) * sign
+                    if decimal and (abs(exponent) > float_maxexp or sigdigits > float_sigdigits):
+                        try:
+                            n = decimal.Decimal(number)
+                            n = n.normalize()
+                        except decimal.Overflow:
+                            if sign<0:
+                                n = neginf
+                            else:
+                                n = inf
+                        else:
+                            n *= sign
+                    else:
+                        n = float(number) * sign
                 except ValueError:
                     raise JSONDecodeError('not a valid JSON numeric literal', s[i:j])
             return n, k
@@ -1111,7 +1228,13 @@ class JSON(object):
         ECMAScript equivalent type.
         
         """
+        if isinstance(n, complex):
+            if n.imag:
+                raise JSONEncodeError('Can not encode a complex number that has a non-zero imaginary part',n)
+            n = n.real
         if isinstance(n, (int,long)):
+            return str(n)
+        if decimal and isinstance(n, decimal.Decimal):
             return str(n)
         global nan, inf, neginf
         if n is nan:
@@ -1132,7 +1255,7 @@ class JSON(object):
                 return 'NaN'
             return repr(n)
         else:
-            raise TypeError('encode_number expected an integral or float number type',type(n))
+            raise TypeError('encode_number expected an integral, float, or decimal number type',type(n))
 
     def decode_string(self, s, i=0, imax=None):
         """Intermediate-level decoder for JSON string literals.
@@ -1161,6 +1284,7 @@ class JSON(object):
         high_surrogate = None
         while i < imax:
             c = s[i]
+            # Make sure a high surrogate is immediately followed by a low surrogate
             if high_surrogate and (i+1 >= imax or s[i:i+2] != '\\u'):
                 raise JSONDecodeError('High unicode surrogate must be followed by a low surrogate',s[i:])
             if c == closer:
@@ -1168,6 +1292,7 @@ class JSON(object):
                 done = True
                 break
             elif c == '\\':
+                # Escaped character
                 i += 1
                 if i >= imax:
                     raise JSONDecodeError('escape in string literal is incomplete',s[i-1:])
@@ -1198,7 +1323,7 @@ class JSON(object):
                     i += 1
                     if c == 'u':
                         digits = 4
-                    else:
+                    else: # c== 'x'
                         if not self._allow_js_string_escapes:
                             raise JSONDecodeError(r'string literals may not use the \x hex-escape in strict JSON',s[i-1:])
                         digits = 2
@@ -1206,9 +1331,11 @@ class JSON(object):
                         raise JSONDecodeError('numeric character escape sequence is truncated',s[i-1:])
                     n = decode_hex( s[i:i+digits] )
                     if high_surrogate:
+                        # Decode surrogate pair and clear high surrogate
                         _append( surrogate_pair_as_unicode( high_surrogate, unichr(n) ) )
                         high_surrogate = None
                     elif n < 128:
+                        # ASCII chars always go in as a str
                         _append( chr(n) )
                     elif 0xd800 <= n <= 0xdbff: # high surrogate
                         if imax < i + digits + 2 or s[i+digits] != '\\' or s[i+digits+1] != 'u':
@@ -1217,37 +1344,35 @@ class JSON(object):
                     elif 0xdc00 <= n <= 0xdfff: # low surrogate
                         raise JSONDecodeError('Low unicode surrogate must be proceeded by a high surrogate',s[i-2:])
                     else:
+                        # Other chars go in as a unicode char
                         _append( unichr(n) )
                     i += digits
                 else:
+                    # Unknown escape sequence
                     if self._allow_nonescape_characters:
                         _append( c )
                         i += 1
                     else:
                         raise JSONDecodeError('unsupported escape code in JSON string literal',s[i-1:])
-            else: # a normal character (non-escape)
+            elif ord(c) <= 0x1f: # A control character
+                if self.islineterm(c):
+                    raise JSONDecodeError('line terminator characters must be escaped inside string literals',s[i:])
+                elif ccallowed:
+                    _append( c )
+                    i += 1
+                else:
+                    raise JSONDecodeError('control characters must be escaped inside JSON string literals',s[i:])
+            else: # A normal character; not an escape sequence or end-quote.
+                # Find a whole sequence of "safe" characters so we can append them
+                # all at once rather than one a time, for speed.
                 j = i
-                #i = skipstringsafe( s, i+1, imax )
                 i += 1
-                while i<imax and s[i] not in unsafe_string_chars:
-                    i+=1
-                if False: #while i < imax and (s[i] != closer and s[i] != '\\'):
-                    c = s[i]
-                    if self.islineterm(c):
-                        raise JSONDecodeError('line terminator characters must be escaped inside string literals',s[i:])
-                    elif ord(c) <= 0x1f and not ccallowed:
-                        # If unicodedata.category(c) == "Cc", JavaScript allows, JSON does not
-                        raise JSONDecodeError('control characters must be escaped inside string JSON literals',s[i:])
+                while i < imax and s[i] not in unsafe_string_chars and s[i] != closer:
                     i += 1
                 _append(s[j:i])
         if not done:
             raise JSONDecodeError('string literal is not terminated with a quotation mark',s)
         s = ''.join( chunks )
-        # Try to convert unicode strings back to ascii strings if possible
-        #try:
-        #    s = s.encode('ascii')
-        #except UnicodeEncodeError:
-        #   pass
         return s, i
 
     def encode_string(self, s):
@@ -1506,7 +1631,17 @@ class JSON(object):
             else:
                 raise JSONDecodeError('array literal (list) is not terminated',txt[starti:])
         return obj, i
-        
+
+    def decode_javascript_identifier(self, name):
+        """Convert a JavaScript identifier into a Python string object.
+
+        This method can be overriden by a subclass to redefine how JavaScript
+        identifiers are turned into Python objects.  By default this just
+        converts them into strings.
+
+        """
+        return name
+
     def decodeobj(self, txt, i=0, imax=None, identifier_as_string=False, only_object_or_array=False):
         """Intermediate-level JSON decoder.
 
@@ -1533,9 +1668,9 @@ class JSON(object):
             obj, i = self.decode_string(txt, i, imax)
         elif c.isdigit() or c in '.+-':
             obj, i = self.decode_number(txt, i, imax)
-        elif c.isalpha():
+        elif c.isalpha() or c in'_$':
             j = i
-            while j < imax and (txt[j].isalnum() or txt[j]=='_'):
+            while j < imax and (txt[j].isalnum() or txt[j] in '_$'):
                 j += 1
             kw = txt[i:j]
             if kw == 'null':
@@ -1553,7 +1688,7 @@ class JSON(object):
                 obj, i = self.decode_number(txt, i)
             else:
                 if identifier_as_string:
-                    obj, i = kw, j
+                    obj, i = self.decode_javascript_identifier(kw), j
                 else:
                     raise JSONDecodeError('unknown keyword or identifier',kw)
         else:
@@ -1615,7 +1750,8 @@ class JSON(object):
                 raise JSONEncodeError('strict JSON does not permit "undefined" values')
         elif isinstance(obj, bool):
             chunklist.append( self.encode_boolean(obj) )
-        elif isinstance(obj, (int,long,float)):
+        elif isinstance(obj, (int,long,float,complex)) or \
+                 (decimal and isinstance(obj, decimal.Decimal)):
             chunklist.append( self.encode_number(obj) )
         elif isinstance(obj, basestring) or isstringtype(obj):
             chunklist.append( self.encode_string(obj) )
@@ -1634,10 +1770,14 @@ class JSON(object):
         """
         #print 'encode_complex_helper(chunklist=%r, obj=%r, nest_level=%r)'%(chunklist,obj,nest_level)
         try:
-            # Is it a sequence?  Try to make an iterator for it.
-            it = iter(obj)
-        except TypeError:
-            it = None
+            # Is it a dictionary or UserDict?  Try iterkeys method first.
+            it = obj.iterkeys()
+        except AttributeError:
+            try:
+                # Is it a sequence?  Try to make an iterator for it.
+                it = iter(obj)
+            except TypeError:
+                it = None
         if it is not None:
             # Does it look like a dictionary?  Check for a minimal dict or
             # UserDict interface.
@@ -1753,7 +1893,7 @@ class JSON(object):
 
 # ------------------------------
 
-def encode( obj, strict=False, compactly=True, escape_unicode=True, encoding=None ):
+def encode( obj, strict=False, compactly=True, escape_unicode=False, encoding=None ):
     """Encodes a Python object into a JSON-encoded string.
 
     If 'strict' is set to True, then only strictly-conforming JSON
