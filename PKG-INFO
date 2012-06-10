@@ -1,12 +1,12 @@
 Metadata-Version: 1.0
 Name: demjson
-Version: 1.1
-Summary: encoder and decoder for JSON (JavaScript Object Notation) compliant with RFC 4627
+Version: 1.2
+Summary: encoder, decoder, and lint/validator for JSON (JavaScript Object Notation) compliant with RFC 4627
 Home-page: http://deron.meranda.us/python/demjson/
 Author: Deron Meranda
 Author-email: deron.meranda@gmail.com
-License: GNU LGPL 2.1
-Download-URL: http://deron.meranda.us/python/demjson/dist/demjson-1.1.tar.gz
+License: GNU GPL 3.0
+Download-URL: http://deron.meranda.us/python/demjson/dist/demjson-1.2.tar.gz
 Description: This module provides classes and functions for encoding or decoding data
         represented in the language-neutral JSON format (which is often used as a
         simpler substitute for XML in Ajax web applications).  This implementation tries
@@ -15,11 +15,13 @@ Description: This module provides classes and functions for encoding or decoding
         syntax.  It includes complete Unicode support, including UTF-32, BOM, and
         surrogate pair processing.  It can also support JavaScript's
         NaN and Infinity numeric types as well as it's 'undefined' type.
-Keywords: JSON,JavaScript,UTF-32
+        It also includes a lint-like JSON syntax validator which tests JSON text
+        for strict compliance to the standard.
+Keywords: JSON,jsonlint,JavaScript,UTF-32
 Platform: UNKNOWN
 Classifier: Development Status :: 5 - Production/Stable
 Classifier: Intended Audience :: Developers
-Classifier: License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)
+Classifier: License :: OSI Approved :: GNU General Public License (GPL)
 Classifier: Operating System :: OS Independent
 Classifier: Programming Language :: Python
 Classifier: Topic :: Software Development :: Libraries :: Python Modules

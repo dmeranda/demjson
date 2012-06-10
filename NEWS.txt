@@ -1,2 +1,6 @@
-2006-11-06 Release 1.1, bug fix and minor enhancements.  See CHANGES.txt for details.
-2006-08-10 Release 1.0, initial release.
+News announcements regarding the demjson python module.
+See the file CHANGES.txt for more details.
+
+2007-11-08  Release 1.2, bug fixes, speed improvements, jsonlint, license now GPL 3.
+2006-11-06  Release 1.1, bug fix and minor enhancements.
+2006-08-10  Release 1.0, initial release.

@@ -6,7 +6,7 @@
 <table width="100%" cellspacing=0 cellpadding=2 border=0 summary="heading">
 <tr bgcolor="#7799ee">
 <td valign=bottom>&nbsp;<br>
-<font color="#ffffff" face="helvetica, arial">&nbsp;<br><big><big><strong>demjson</strong></big></big> (version 1.1, 2006-11-06)</font></td
+<font color="#ffffff" face="helvetica, arial">&nbsp;<br><big><big><strong>demjson</strong></big></big> (version 1.2, 2007-11-08)</font></td
 ><td align=right valign=bottom
 ><font color="#ffffff" face="helvetica, arial"><a href=".">index</a><br><a href="demjson.py">demjson.py</a></font></td></tr></table>
     <p><tt>A&nbsp;<a href="#JSON">JSON</a>&nbsp;data&nbsp;encoder&nbsp;and&nbsp;decoder.<br>
@@ -17,7 +17,7 @@ primitive&nbsp;data&nbsp;types&nbsp;(numbers,&nbsp;strings,&nbsp;booleans,&nbsp;
 associative&nbsp;arrays)&nbsp;in&nbsp;a&nbsp;language-neutral&nbsp;simple&nbsp;text-based&nbsp;syntax.<br>
 &nbsp;<br>
 It&nbsp;can&nbsp;encode&nbsp;or&nbsp;decode&nbsp;between&nbsp;<a href="#JSON">JSON</a>&nbsp;formatted&nbsp;strings&nbsp;and&nbsp;native<br>
-Python&nbsp;data&nbsp;types.&nbsp;&nbsp;Normally&nbsp;you&nbsp;would&nbsp;use&nbsp;the&nbsp;<a href="#-encode">encode</a>()&nbsp;and&nbsp;<a href="#-decode">decode</a>()<br>
+Python&nbsp;data&nbsp;types.&nbsp;&nbsp;Normally&nbsp;you&nbsp;would&nbsp;use&nbsp;the&nbsp;encode()&nbsp;and&nbsp;decode()<br>
 functions&nbsp;defined&nbsp;by&nbsp;this&nbsp;module,&nbsp;but&nbsp;if&nbsp;you&nbsp;want&nbsp;more&nbsp;control&nbsp;over<br>
 the&nbsp;processing&nbsp;you&nbsp;can&nbsp;use&nbsp;the&nbsp;<a href="#JSON">JSON</a>&nbsp;class.<br>
 &nbsp;<br>
@@ -129,9 +129,14 @@ References:<br>
 <dt><font face="helvetica, arial"><a href="exceptions.html#ValueError">exceptions.ValueError</a>(<a href="exceptions.html#StandardError">exceptions.StandardError</a>)
 </font></dt><dd>
 <dl>
+<dt><font face="helvetica, arial"><a href="demjson.html#JSONError">JSONError</a>
+</font></dt><dd>
+<dl>
 <dt><font face="helvetica, arial"><a href="demjson.html#JSONDecodeError">JSONDecodeError</a>
 </font></dt><dt><font face="helvetica, arial"><a href="demjson.html#JSONEncodeError">JSONEncodeError</a>
 </font></dt></dl>
+</dd>
+</dl>
 </dd>
 <dt><font face="helvetica, arial"><a href="__builtin__.html#object">__builtin__.object</a>
 </font></dt><dd>
@@ -180,15 +185,15 @@ added&nbsp;to&nbsp;make&nbsp;it&nbsp;more&nbsp;readable.<br>
 &nbsp;<br>
 If&nbsp;'escape_unicode'&nbsp;is&nbsp;set&nbsp;to&nbsp;True,&nbsp;then&nbsp;all&nbsp;non-ASCII&nbsp;characters<br>
 will&nbsp;be&nbsp;represented&nbsp;as&nbsp;a&nbsp;unicode&nbsp;escape&nbsp;sequence;&nbsp;if&nbsp;False&nbsp;then<br>
-the&nbsp;actual&nbsp;real&nbsp;unicode&nbsp;character&nbsp;will&nbsp;be&nbsp;inserted.<br>
+the&nbsp;actual&nbsp;real&nbsp;unicode&nbsp;character&nbsp;will&nbsp;be&nbsp;inserted&nbsp;if&nbsp;possible.<br>
 &nbsp;<br>
 The&nbsp;'escape_unicode'&nbsp;can&nbsp;also&nbsp;be&nbsp;a&nbsp;function,&nbsp;which&nbsp;when&nbsp;called<br>
 with&nbsp;a&nbsp;single&nbsp;argument&nbsp;of&nbsp;a&nbsp;unicode&nbsp;character&nbsp;will&nbsp;return&nbsp;True<br>
 if&nbsp;the&nbsp;character&nbsp;should&nbsp;be&nbsp;escaped&nbsp;or&nbsp;False&nbsp;if&nbsp;it&nbsp;should&nbsp;not.<br>
 &nbsp;<br>
-If&nbsp;you&nbsp;wish&nbsp;to&nbsp;extend&nbsp;the&nbsp;encoding&nbsp;to&nbsp;ba&nbsp;able&nbsp;to&nbsp;handle&nbsp;additional<br>
-types,&nbsp;you&nbsp;should&nbsp;subclass&nbsp;this&nbsp;class&nbsp;and&nbsp;override&nbsp;the<br>
-<a href="#JSON-encode_default">encode_default</a>()&nbsp;method.</tt></dd></dl>
+If&nbsp;you&nbsp;wish&nbsp;to&nbsp;extend&nbsp;the&nbsp;encoding&nbsp;to&nbsp;ba&nbsp;able&nbsp;to&nbsp;handle<br>
+additional&nbsp;types,&nbsp;you&nbsp;should&nbsp;subclass&nbsp;this&nbsp;class&nbsp;and&nbsp;override<br>
+the&nbsp;<a href="#JSON-encode_default">encode_default</a>()&nbsp;method.</tt></dd></dl>
 
 <dl><dt><a name="JSON-allow"><strong>allow</strong></a>(self, behavior)</dt><dd><tt>Allow&nbsp;the&nbsp;specified&nbsp;behavior&nbsp;(turn&nbsp;off&nbsp;a&nbsp;strictness&nbsp;check).<br>
 &nbsp;<br>
@@ -203,7 +208,7 @@ allowed_behaviors&nbsp;property.</tt></dd></dl>
 Takes&nbsp;a&nbsp;string&nbsp;and&nbsp;a&nbsp;starting&nbsp;index,&nbsp;and&nbsp;returns&nbsp;a&nbsp;Python&nbsp;bool<br>
 (True&nbsp;or&nbsp;False)&nbsp;and&nbsp;the&nbsp;index&nbsp;of&nbsp;the&nbsp;next&nbsp;unparsed&nbsp;character.</tt></dd></dl>
 
-<dl><dt><a name="JSON-decode_composite"><strong>decode_composite</strong></a>(self, txt, i<font color="#909090">=0</font>)</dt><dd><tt>Intermediate-level&nbsp;<a href="#JSON">JSON</a>&nbsp;decoder&nbsp;for&nbsp;composite&nbsp;literal&nbsp;types&nbsp;(array&nbsp;and&nbsp;<a href="__builtin__.html#object">object</a>).<br>
+<dl><dt><a name="JSON-decode_composite"><strong>decode_composite</strong></a>(self, txt, i<font color="#909090">=0</font>, imax<font color="#909090">=None</font>)</dt><dd><tt>Intermediate-level&nbsp;<a href="#JSON">JSON</a>&nbsp;decoder&nbsp;for&nbsp;composite&nbsp;literal&nbsp;types&nbsp;(array&nbsp;and&nbsp;<a href="__builtin__.html#object">object</a>).<br>
 &nbsp;<br>
 Takes&nbsp;text&nbsp;and&nbsp;a&nbsp;starting&nbsp;index,&nbsp;and&nbsp;returns&nbsp;either&nbsp;a&nbsp;Python&nbsp;list&nbsp;or<br>
 dictionary&nbsp;and&nbsp;the&nbsp;index&nbsp;of&nbsp;the&nbsp;next&nbsp;unparsed&nbsp;character.</tt></dd></dl>
@@ -213,10 +218,10 @@ dictionary&nbsp;and&nbsp;the&nbsp;index&nbsp;of&nbsp;the&nbsp;next&nbsp;unparsed
 Takes&nbsp;a&nbsp;string&nbsp;and&nbsp;a&nbsp;starting&nbsp;index,&nbsp;and&nbsp;returns&nbsp;a&nbsp;Python<br>
 None&nbsp;<a href="__builtin__.html#object">object</a>&nbsp;and&nbsp;the&nbsp;index&nbsp;of&nbsp;the&nbsp;next&nbsp;unparsed&nbsp;character.</tt></dd></dl>
 
-<dl><dt><a name="JSON-decode_number"><strong>decode_number</strong></a>(self, s, i<font color="#909090">=0</font>)</dt><dd><tt>Intermediate-level&nbsp;decoder&nbsp;for&nbsp;<a href="#JSON">JSON</a>&nbsp;numeric&nbsp;literals.<br>
+<dl><dt><a name="JSON-decode_number"><strong>decode_number</strong></a>(self, s, i<font color="#909090">=0</font>, imax<font color="#909090">=None</font>)</dt><dd><tt>Intermediate-level&nbsp;decoder&nbsp;for&nbsp;<a href="#JSON">JSON</a>&nbsp;numeric&nbsp;literals.<br>
 &nbsp;<br>
 Takes&nbsp;a&nbsp;string&nbsp;and&nbsp;a&nbsp;starting&nbsp;index,&nbsp;and&nbsp;returns&nbsp;a&nbsp;Python<br>
-numeric&nbsp;type&nbsp;and&nbsp;the&nbsp;index&nbsp;of&nbsp;the&nbsp;next&nbsp;unparsed&nbsp;character.<br>
+suitable&nbsp;numeric&nbsp;type&nbsp;and&nbsp;the&nbsp;index&nbsp;of&nbsp;the&nbsp;next&nbsp;unparsed&nbsp;character.<br>
 &nbsp;<br>
 The&nbsp;returned&nbsp;numeric&nbsp;type&nbsp;can&nbsp;be&nbsp;either&nbsp;of&nbsp;a&nbsp;Python&nbsp;int,<br>
 long,&nbsp;or&nbsp;float.&nbsp;&nbsp;In&nbsp;addition&nbsp;some&nbsp;special&nbsp;non-numbers&nbsp;may<br>
@@ -225,13 +230,13 @@ which&nbsp;are&nbsp;Python&nbsp;floats,&nbsp;but&nbsp;have&nbsp;no&nbsp;numeric&
 &nbsp;<br>
 Ref.&nbsp;ECMAScript&nbsp;section&nbsp;8.5.</tt></dd></dl>
 
-<dl><dt><a name="JSON-decode_string"><strong>decode_string</strong></a>(self, s, i<font color="#909090">=0</font>)</dt><dd><tt>Intermediate-level&nbsp;decoder&nbsp;for&nbsp;<a href="#JSON">JSON</a>&nbsp;string&nbsp;literals.<br>
+<dl><dt><a name="JSON-decode_string"><strong>decode_string</strong></a>(self, s, i<font color="#909090">=0</font>, imax<font color="#909090">=None</font>)</dt><dd><tt>Intermediate-level&nbsp;decoder&nbsp;for&nbsp;<a href="#JSON">JSON</a>&nbsp;string&nbsp;literals.<br>
 &nbsp;<br>
 Takes&nbsp;a&nbsp;string&nbsp;and&nbsp;a&nbsp;starting&nbsp;index,&nbsp;and&nbsp;returns&nbsp;a&nbsp;Python<br>
 string&nbsp;(or&nbsp;unicode&nbsp;string)&nbsp;and&nbsp;the&nbsp;index&nbsp;of&nbsp;the&nbsp;next&nbsp;unparsed<br>
 character.</tt></dd></dl>
 
-<dl><dt><a name="JSON-decodeobj"><strong>decodeobj</strong></a>(self, txt, i<font color="#909090">=0</font>, identifier_as_string<font color="#909090">=False</font>)</dt><dd><tt>Intermediate-level&nbsp;<a href="#JSON">JSON</a>&nbsp;decoder.<br>
+<dl><dt><a name="JSON-decodeobj"><strong>decodeobj</strong></a>(self, txt, i<font color="#909090">=0</font>, imax<font color="#909090">=None</font>, identifier_as_string<font color="#909090">=False</font>, only_object_or_array<font color="#909090">=False</font>)</dt><dd><tt>Intermediate-level&nbsp;<a href="#JSON">JSON</a>&nbsp;decoder.<br>
 &nbsp;<br>
 Takes&nbsp;a&nbsp;string&nbsp;and&nbsp;a&nbsp;starting&nbsp;index,&nbsp;and&nbsp;returns&nbsp;a&nbsp;two-tuple&nbsp;consting<br>
 of&nbsp;a&nbsp;Python&nbsp;<a href="__builtin__.html#object">object</a>&nbsp;and&nbsp;the&nbsp;index&nbsp;of&nbsp;the&nbsp;next&nbsp;unparsed&nbsp;character.<br>
@@ -258,6 +263,14 @@ can&nbsp;be&nbsp;encoded.</tt></dd></dl>
 
 <dl><dt><a name="JSON-encode_boolean"><strong>encode_boolean</strong></a>(self, b)</dt><dd><tt>Encodes&nbsp;the&nbsp;Python&nbsp;boolean&nbsp;into&nbsp;a&nbsp;<a href="#JSON">JSON</a>&nbsp;Boolean&nbsp;literal.</tt></dd></dl>
 
+<dl><dt><a name="JSON-encode_composite"><strong>encode_composite</strong></a>(self, chunklist, obj, nest_level)</dt><dd><tt>Encodes&nbsp;just&nbsp;dictionaries,&nbsp;lists,&nbsp;or&nbsp;sequences.<br>
+&nbsp;<br>
+Basically&nbsp;handles&nbsp;any&nbsp;python&nbsp;type&nbsp;for&nbsp;which&nbsp;iter()&nbsp;can&nbsp;create<br>
+an&nbsp;iterator&nbsp;<a href="__builtin__.html#object">object</a>.<br>
+&nbsp;<br>
+This&nbsp;method&nbsp;is&nbsp;not&nbsp;intended&nbsp;to&nbsp;be&nbsp;called&nbsp;directly.&nbsp;&nbsp;Use&nbsp;the<br>
+<a href="#JSON-encode">encode</a>()&nbsp;method&nbsp;instead.</tt></dd></dl>
+
 <dl><dt><a name="JSON-encode_default"><strong>encode_default</strong></a>(self, obj, nest_level<font color="#909090">=0</font>)</dt><dd><tt>This&nbsp;method&nbsp;is&nbsp;used&nbsp;to&nbsp;encode&nbsp;objects&nbsp;into&nbsp;<a href="#JSON">JSON</a>&nbsp;which&nbsp;are&nbsp;not&nbsp;straightforward.<br>
 &nbsp;<br>
 This&nbsp;method&nbsp;is&nbsp;intended&nbsp;to&nbsp;be&nbsp;overridden&nbsp;by&nbsp;subclasses&nbsp;which&nbsp;wish<br>
@@ -275,6 +288,8 @@ strategy.<br>
 If&nbsp;a&nbsp;caller&nbsp;wishes&nbsp;to&nbsp;disable&nbsp;the&nbsp;calling&nbsp;of&nbsp;json_equivalent()<br>
 methods,&nbsp;then&nbsp;subclass&nbsp;this&nbsp;class&nbsp;and&nbsp;override&nbsp;this&nbsp;method<br>
 to&nbsp;just&nbsp;return&nbsp;None.</tt></dd></dl>
+
+<dl><dt><a name="JSON-encode_helper"><strong>encode_helper</strong></a>(self, chunklist, obj, nest_level)</dt></dl>
 
 <dl><dt><a name="JSON-encode_null"><strong>encode_null</strong></a>(self)</dt><dd><tt>Produces&nbsp;the&nbsp;<a href="#JSON">JSON</a>&nbsp;'null'&nbsp;keyword.</tt></dd></dl>
 
@@ -313,7 +328,9 @@ prevented_behaviors&nbsp;property.</tt></dd></dl>
 The&nbsp;contents&nbsp;of&nbsp;the&nbsp;comment&nbsp;are&nbsp;returned&nbsp;as&nbsp;a&nbsp;string,&nbsp;as&nbsp;well<br>
 as&nbsp;the&nbsp;index&nbsp;of&nbsp;the&nbsp;character&nbsp;immediately&nbsp;after&nbsp;the&nbsp;comment.</tt></dd></dl>
 
-<dl><dt><a name="JSON-skipws"><strong>skipws</strong></a>(self, txt, i<font color="#909090">=0</font>, skip_comments<font color="#909090">=True</font>)</dt><dd><tt>Skips&nbsp;all&nbsp;whitespace.<br>
+<dl><dt><a name="JSON-skipws"><strong>skipws</strong></a>(self, txt, i<font color="#909090">=0</font>, imax<font color="#909090">=None</font>, skip_comments<font color="#909090">=True</font>)</dt><dd><tt>Skips&nbsp;whitespace.</tt></dd></dl>
+
+<dl><dt><a name="JSON-skipws_any"><strong>skipws_any</strong></a>(self, txt, i<font color="#909090">=0</font>, imax<font color="#909090">=None</font>, skip_comments<font color="#909090">=True</font>)</dt><dd><tt>Skips&nbsp;all&nbsp;whitespace,&nbsp;including&nbsp;comments&nbsp;and&nbsp;unicode&nbsp;whitespace<br>
 &nbsp;<br>
 Takes&nbsp;a&nbsp;string&nbsp;and&nbsp;a&nbsp;starting&nbsp;index,&nbsp;and&nbsp;returns&nbsp;the&nbsp;index&nbsp;of&nbsp;the<br>
 next&nbsp;non-whitespace&nbsp;character.<br>
@@ -364,17 +381,22 @@ Data and other attributes defined here:<br>
 <table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
 <tr bgcolor="#ffc8d8">
 <td colspan=3 valign=bottom>&nbsp;<br>
-<font color="#000000" face="helvetica, arial"><a name="JSONDecodeError">class <strong>JSONDecodeError</strong></a>(<a href="exceptions.html#ValueError">exceptions.ValueError</a>)</font></td></tr>
+<font color="#000000" face="helvetica, arial"><a name="JSONDecodeError">class <strong>JSONDecodeError</strong></a>(<a href="demjson.html#JSONError">JSONError</a>)</font></td></tr>
     
 <tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
 <td colspan=2><tt>An&nbsp;exception&nbsp;class&nbsp;raised&nbsp;when&nbsp;a&nbsp;<a href="#JSON">JSON</a>&nbsp;decoding&nbsp;error&nbsp;(syntax&nbsp;error)&nbsp;occurs.<br>&nbsp;</tt></td></tr>
 <tr><td>&nbsp;</td>
 <td width="100%"><dl><dt>Method resolution order:</dt>
 <dd><a href="demjson.html#JSONDecodeError">JSONDecodeError</a></dd>
+<dd><a href="demjson.html#JSONError">JSONError</a></dd>
 <dd><a href="exceptions.html#ValueError">exceptions.ValueError</a></dd>
 <dd><a href="exceptions.html#StandardError">exceptions.StandardError</a></dd>
 <dd><a href="exceptions.html#Exception">exceptions.Exception</a></dd>
 </dl>
+<hr>
+Methods inherited from <a href="demjson.html#JSONError">JSONError</a>:<br>
+<dl><dt><a name="JSONDecodeError-pretty_description"><strong>pretty_description</strong></a>(self)</dt></dl>
+
 <hr>
 Methods inherited from <a href="exceptions.html#Exception">exceptions.Exception</a>:<br>
 <dl><dt><a name="JSONDecodeError-__getitem__"><strong>__getitem__</strong></a>(...)</dt></dl>
@@ -387,17 +409,22 @@ Methods inherited from <a href="exceptions.html#Exception">exceptions.Exception<
 <table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
 <tr bgcolor="#ffc8d8">
 <td colspan=3 valign=bottom>&nbsp;<br>
-<font color="#000000" face="helvetica, arial"><a name="JSONEncodeError">class <strong>JSONEncodeError</strong></a>(<a href="exceptions.html#ValueError">exceptions.ValueError</a>)</font></td></tr>
+<font color="#000000" face="helvetica, arial"><a name="JSONEncodeError">class <strong>JSONEncodeError</strong></a>(<a href="demjson.html#JSONError">JSONError</a>)</font></td></tr>
     
 <tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
 <td colspan=2><tt>An&nbsp;exception&nbsp;class&nbsp;raised&nbsp;when&nbsp;a&nbsp;python&nbsp;<a href="__builtin__.html#object">object</a>&nbsp;can&nbsp;not&nbsp;be&nbsp;encoded&nbsp;as&nbsp;a&nbsp;<a href="#JSON">JSON</a>&nbsp;string.<br>&nbsp;</tt></td></tr>
 <tr><td>&nbsp;</td>
 <td width="100%"><dl><dt>Method resolution order:</dt>
 <dd><a href="demjson.html#JSONEncodeError">JSONEncodeError</a></dd>
+<dd><a href="demjson.html#JSONError">JSONError</a></dd>
 <dd><a href="exceptions.html#ValueError">exceptions.ValueError</a></dd>
 <dd><a href="exceptions.html#StandardError">exceptions.StandardError</a></dd>
 <dd><a href="exceptions.html#Exception">exceptions.Exception</a></dd>
 </dl>
+<hr>
+Methods inherited from <a href="demjson.html#JSONError">JSONError</a>:<br>
+<dl><dt><a name="JSONEncodeError-pretty_description"><strong>pretty_description</strong></a>(self)</dt></dl>
+
 <hr>
 Methods inherited from <a href="exceptions.html#Exception">exceptions.Exception</a>:<br>
 <dl><dt><a name="JSONEncodeError-__getitem__"><strong>__getitem__</strong></a>(...)</dt></dl>
@@ -406,97 +433,34 @@ Methods inherited from <a href="exceptions.html#Exception">exceptions.Exception<
 
 <dl><dt><a name="JSONEncodeError-__str__"><strong>__str__</strong></a>(...)</dt></dl>
 
-</td></tr></table></td></tr></table><p>
+</td></tr></table> <p>
 <table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
-<tr bgcolor="#eeaa77">
+<tr bgcolor="#ffc8d8">
 <td colspan=3 valign=bottom>&nbsp;<br>
-<font color="#ffffff" face="helvetica, arial"><big><strong>Functions</strong></big></font></td></tr>
+<font color="#000000" face="helvetica, arial"><a name="JSONError">class <strong>JSONError</strong></a>(<a href="exceptions.html#ValueError">exceptions.ValueError</a>)</font></td></tr>
     
-<tr><td bgcolor="#eeaa77"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
-<td width="100%"><dl><dt><a name="-auto_unicode_decode"><strong>auto_unicode_decode</strong></a>(s)</dt><dd><tt>Takes&nbsp;a&nbsp;string&nbsp;and&nbsp;tries&nbsp;to&nbsp;convert&nbsp;it&nbsp;to&nbsp;a&nbsp;Unicode&nbsp;string.<br>
-&nbsp;<br>
-This&nbsp;will&nbsp;return&nbsp;a&nbsp;Python&nbsp;unicode&nbsp;string&nbsp;type&nbsp;corresponding&nbsp;to&nbsp;the<br>
-input&nbsp;string&nbsp;(either&nbsp;str&nbsp;or&nbsp;unicode).&nbsp;&nbsp;The&nbsp;character&nbsp;encoding&nbsp;is<br>
-guessed&nbsp;by&nbsp;looking&nbsp;for&nbsp;either&nbsp;a&nbsp;Unicode&nbsp;BOM&nbsp;prefix,&nbsp;or&nbsp;by&nbsp;the<br>
-rules&nbsp;specified&nbsp;by&nbsp;<a href="http://www.rfc-editor.org/rfc/rfc4627.txt">RFC&nbsp;4627</a>.&nbsp;&nbsp;When&nbsp;in&nbsp;doubt&nbsp;it&nbsp;is&nbsp;assumed&nbsp;the<br>
-input&nbsp;is&nbsp;encoded&nbsp;in&nbsp;UTF-8&nbsp;(the&nbsp;default&nbsp;for&nbsp;<a href="#JSON">JSON</a>).</tt></dd></dl>
- <dl><dt><a name="-decode"><strong>decode</strong></a>(txt, strict<font color="#909090">=False</font>, encoding<font color="#909090">=None</font>, **kw)</dt><dd><tt>Decodes&nbsp;a&nbsp;<a href="#JSON">JSON</a>-encoded&nbsp;string&nbsp;into&nbsp;a&nbsp;Python&nbsp;<a href="__builtin__.html#object">object</a>.<br>
-&nbsp;<br>
-If&nbsp;'strict'&nbsp;is&nbsp;set&nbsp;to&nbsp;True,&nbsp;then&nbsp;those&nbsp;strings&nbsp;that&nbsp;are&nbsp;not<br>
-entirely&nbsp;strictly&nbsp;conforming&nbsp;to&nbsp;<a href="#JSON">JSON</a>&nbsp;will&nbsp;result&nbsp;in&nbsp;a<br>
-<a href="#JSONDecodeError">JSONDecodeError</a>&nbsp;exception.<br>
-&nbsp;<br>
-The&nbsp;input&nbsp;string&nbsp;can&nbsp;be&nbsp;either&nbsp;a&nbsp;python&nbsp;string&nbsp;or&nbsp;a&nbsp;python&nbsp;unicode<br>
-string.&nbsp;&nbsp;If&nbsp;it&nbsp;is&nbsp;already&nbsp;a&nbsp;unicode&nbsp;string,&nbsp;then&nbsp;it&nbsp;is&nbsp;assumed<br>
-that&nbsp;no&nbsp;character&nbsp;set&nbsp;decoding&nbsp;is&nbsp;required.<br>
-&nbsp;<br>
-However,&nbsp;if&nbsp;you&nbsp;pass&nbsp;in&nbsp;a&nbsp;non-Unicode&nbsp;text&nbsp;string&nbsp;(i.e.,&nbsp;a&nbsp;python<br>
-type&nbsp;'str')&nbsp;then&nbsp;an&nbsp;attempt&nbsp;will&nbsp;be&nbsp;made&nbsp;to&nbsp;auto-detect&nbsp;and&nbsp;decode<br>
-the&nbsp;character&nbsp;encoding.&nbsp;&nbsp;This&nbsp;will&nbsp;be&nbsp;successful&nbsp;if&nbsp;the&nbsp;input&nbsp;was<br>
-encoded&nbsp;in&nbsp;any&nbsp;of&nbsp;UTF-8,&nbsp;UTF-16&nbsp;(BE&nbsp;or&nbsp;LE),&nbsp;or&nbsp;UTF-32&nbsp;(BE&nbsp;or&nbsp;LE),<br>
-and&nbsp;of&nbsp;course&nbsp;plain&nbsp;ASCII&nbsp;works&nbsp;too.<br>
-&nbsp;<br>
-Note&nbsp;though&nbsp;that&nbsp;if&nbsp;you&nbsp;know&nbsp;the&nbsp;character&nbsp;encoding,&nbsp;then&nbsp;you<br>
-should&nbsp;convert&nbsp;to&nbsp;a&nbsp;unicode&nbsp;string&nbsp;yourself,&nbsp;or&nbsp;pass&nbsp;it&nbsp;the&nbsp;name<br>
-of&nbsp;the&nbsp;'encoding'&nbsp;to&nbsp;avoid&nbsp;the&nbsp;guessing&nbsp;made&nbsp;by&nbsp;the&nbsp;auto<br>
-detection,&nbsp;as&nbsp;with<br>
-&nbsp;<br>
-&nbsp;&nbsp;&nbsp;&nbsp;python_object&nbsp;=&nbsp;demjson.<a href="#-decode">decode</a>(&nbsp;input_bytes,&nbsp;encoding='utf8'&nbsp;)<br>
-&nbsp;<br>
-Optional&nbsp;keywords&nbsp;arguments&nbsp;must&nbsp;be&nbsp;of&nbsp;the&nbsp;form<br>
-&nbsp;&nbsp;&nbsp;&nbsp;allow_xxxx=True/False<br>
-or<br>
-&nbsp;&nbsp;&nbsp;&nbsp;prevent_xxxx=True/False<br>
-where&nbsp;each&nbsp;will&nbsp;allow&nbsp;or&nbsp;prevent&nbsp;the&nbsp;specific&nbsp;behavior,&nbsp;after&nbsp;the<br>
-evaluation&nbsp;of&nbsp;the&nbsp;'strict'&nbsp;argument.&nbsp;&nbsp;For&nbsp;example,&nbsp;if&nbsp;strict=True<br>
-then&nbsp;by&nbsp;also&nbsp;passing&nbsp;'allow_comments=True'&nbsp;then&nbsp;comments&nbsp;will&nbsp;be<br>
-allowed.&nbsp;&nbsp;If&nbsp;strict=False&nbsp;then&nbsp;prevent_comments=True&nbsp;will&nbsp;allow<br>
-everything&nbsp;except&nbsp;comments.</tt></dd></dl>
- <dl><dt><a name="-decode_hex"><strong>decode_hex</strong></a>(hexstring)</dt><dd><tt>Decodes&nbsp;a&nbsp;hexadecimal&nbsp;string&nbsp;into&nbsp;it's&nbsp;integer&nbsp;value.</tt></dd></dl>
- <dl><dt><a name="-decode_octal"><strong>decode_octal</strong></a>(octalstring)</dt><dd><tt>Decodes&nbsp;an&nbsp;octal&nbsp;string&nbsp;into&nbsp;it's&nbsp;integer&nbsp;value.</tt></dd></dl>
- <dl><dt><a name="-encode"><strong>encode</strong></a>(obj, strict<font color="#909090">=False</font>, compactly<font color="#909090">=True</font>, escape_unicode<font color="#909090">=True</font>, encoding<font color="#909090">=None</font>)</dt><dd><tt>Encodes&nbsp;a&nbsp;Python&nbsp;<a href="__builtin__.html#object">object</a>&nbsp;into&nbsp;a&nbsp;<a href="#JSON">JSON</a>-encoded&nbsp;string.<br>
-&nbsp;<br>
-If&nbsp;'strict'&nbsp;is&nbsp;set&nbsp;to&nbsp;True,&nbsp;then&nbsp;only&nbsp;strictly-conforming&nbsp;<a href="#JSON">JSON</a><br>
-output&nbsp;will&nbsp;be&nbsp;produced.&nbsp;&nbsp;Note&nbsp;that&nbsp;this&nbsp;means&nbsp;that&nbsp;some&nbsp;types<br>
-of&nbsp;values&nbsp;may&nbsp;not&nbsp;be&nbsp;convertable&nbsp;and&nbsp;will&nbsp;result&nbsp;in&nbsp;a<br>
-<a href="#JSONEncodeError">JSONEncodeError</a>&nbsp;exception.<br>
-&nbsp;<br>
-If&nbsp;'compactly'&nbsp;is&nbsp;set&nbsp;to&nbsp;True,&nbsp;then&nbsp;the&nbsp;resulting&nbsp;string&nbsp;will<br>
-have&nbsp;all&nbsp;extraneous&nbsp;white&nbsp;space&nbsp;removed;&nbsp;if&nbsp;False&nbsp;then&nbsp;the<br>
-string&nbsp;will&nbsp;be&nbsp;"pretty&nbsp;printed"&nbsp;with&nbsp;whitespace&nbsp;and&nbsp;indentation<br>
-added&nbsp;to&nbsp;make&nbsp;it&nbsp;more&nbsp;readable.<br>
-&nbsp;<br>
-If&nbsp;'escape_unicode'&nbsp;is&nbsp;set&nbsp;to&nbsp;True,&nbsp;then&nbsp;all&nbsp;non-ASCII&nbsp;characters<br>
-will&nbsp;be&nbsp;represented&nbsp;as&nbsp;a&nbsp;unicode&nbsp;escape&nbsp;sequence;&nbsp;if&nbsp;False&nbsp;then<br>
-the&nbsp;actual&nbsp;real&nbsp;unicode&nbsp;character&nbsp;will&nbsp;be&nbsp;inserted.<br>
-&nbsp;<br>
-If&nbsp;no&nbsp;encoding&nbsp;is&nbsp;specified&nbsp;(encoding=None)&nbsp;then&nbsp;the&nbsp;output&nbsp;will<br>
-either&nbsp;be&nbsp;a&nbsp;Python&nbsp;string&nbsp;(if&nbsp;entirely&nbsp;ASCII)&nbsp;or&nbsp;a&nbsp;Python&nbsp;unicode<br>
-string&nbsp;type.<br>
-&nbsp;<br>
-However&nbsp;if&nbsp;an&nbsp;encoding&nbsp;name&nbsp;is&nbsp;given&nbsp;then&nbsp;the&nbsp;returned&nbsp;value&nbsp;will<br>
-be&nbsp;a&nbsp;python&nbsp;string&nbsp;which&nbsp;is&nbsp;the&nbsp;byte&nbsp;sequence&nbsp;encoding&nbsp;the&nbsp;<a href="#JSON">JSON</a><br>
-value.&nbsp;&nbsp;As&nbsp;the&nbsp;default/recommended&nbsp;encoding&nbsp;for&nbsp;<a href="#JSON">JSON</a>&nbsp;is&nbsp;UTF-8,<br>
-you&nbsp;should&nbsp;almost&nbsp;always&nbsp;pass&nbsp;in&nbsp;encoding='utf8'.</tt></dd></dl>
- <dl><dt><a name="-isnumbertype"><strong>isnumbertype</strong></a>(obj)</dt><dd><tt>Is&nbsp;the&nbsp;<a href="__builtin__.html#object">object</a>&nbsp;of&nbsp;a&nbsp;Python&nbsp;number&nbsp;type&nbsp;(excluding&nbsp;complex)?</tt></dd></dl>
- <dl><dt><a name="-isstringtype"><strong>isstringtype</strong></a>(obj)</dt><dd><tt>Is&nbsp;the&nbsp;<a href="__builtin__.html#object">object</a>&nbsp;of&nbsp;a&nbsp;Python&nbsp;string&nbsp;type?</tt></dd></dl>
- <dl><dt><a name="-surrogate_pair_as_unicode"><strong>surrogate_pair_as_unicode</strong></a>(c1, c2)</dt><dd><tt>Takes&nbsp;a&nbsp;pair&nbsp;of&nbsp;unicode&nbsp;characters&nbsp;and&nbsp;returns&nbsp;the&nbsp;equivalent&nbsp;unicode&nbsp;character.<br>
-&nbsp;<br>
-The&nbsp;input&nbsp;pair&nbsp;must&nbsp;be&nbsp;a&nbsp;surrogate&nbsp;pair,&nbsp;with&nbsp;c1&nbsp;in&nbsp;the&nbsp;range<br>
-U+D800&nbsp;to&nbsp;U+DBFF&nbsp;and&nbsp;c2&nbsp;in&nbsp;the&nbsp;range&nbsp;U+DC00&nbsp;to&nbsp;U+DFFF.</tt></dd></dl>
- <dl><dt><a name="-unicode_as_surrogate_pair"><strong>unicode_as_surrogate_pair</strong></a>(c)</dt><dd><tt>Takes&nbsp;a&nbsp;single&nbsp;unicode&nbsp;character&nbsp;and&nbsp;returns&nbsp;a&nbsp;sequence&nbsp;of&nbsp;surrogate&nbsp;pairs.<br>
-&nbsp;<br>
-The&nbsp;output&nbsp;of&nbsp;this&nbsp;function&nbsp;is&nbsp;a&nbsp;tuple&nbsp;consisting&nbsp;of&nbsp;one&nbsp;or&nbsp;two&nbsp;unicode<br>
-characters,&nbsp;such&nbsp;that&nbsp;if&nbsp;the&nbsp;input&nbsp;character&nbsp;is&nbsp;outside&nbsp;the&nbsp;BMP&nbsp;range<br>
-then&nbsp;the&nbsp;output&nbsp;is&nbsp;a&nbsp;two-character&nbsp;surrogate&nbsp;pair&nbsp;representing&nbsp;that&nbsp;character.<br>
-&nbsp;<br>
-If&nbsp;the&nbsp;input&nbsp;character&nbsp;is&nbsp;inside&nbsp;the&nbsp;BMP&nbsp;then&nbsp;the&nbsp;output&nbsp;tuple&nbsp;will&nbsp;have<br>
-just&nbsp;a&nbsp;single&nbsp;character...the&nbsp;same&nbsp;one.</tt></dd></dl>
- <dl><dt><a name="-utf32be_decode"><strong>utf32be_decode</strong></a>(obj, errors<font color="#909090">='strict'</font>)</dt><dd><tt>Decodes&nbsp;a&nbsp;UTF-32BE&nbsp;byte&nbsp;string&nbsp;into&nbsp;a&nbsp;Unicode&nbsp;string.</tt></dd></dl>
- <dl><dt><a name="-utf32be_encode"><strong>utf32be_encode</strong></a>(obj, errors<font color="#909090">='strict'</font>)</dt><dd><tt>Encodes&nbsp;a&nbsp;Unicode&nbsp;string&nbsp;into&nbsp;a&nbsp;UTF-32BE&nbsp;encoded&nbsp;byte&nbsp;string.</tt></dd></dl>
- <dl><dt><a name="-utf32le_decode"><strong>utf32le_decode</strong></a>(obj, errors<font color="#909090">='strict'</font>)</dt><dd><tt>Decodes&nbsp;a&nbsp;UTF-32LE&nbsp;byte&nbsp;string&nbsp;into&nbsp;a&nbsp;Unicode&nbsp;string.</tt></dd></dl>
- <dl><dt><a name="-utf32le_encode"><strong>utf32le_encode</strong></a>(obj, errors<font color="#909090">='strict'</font>)</dt><dd><tt>Encodes&nbsp;a&nbsp;Unicode&nbsp;string&nbsp;into&nbsp;a&nbsp;UTF-32LE&nbsp;encoded&nbsp;byte&nbsp;string.</tt></dd></dl>
-</td></tr></table><p>
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>Our&nbsp;base&nbsp;class&nbsp;for&nbsp;all&nbsp;<a href="#JSON">JSON</a>-related&nbsp;errors.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="demjson.html#JSONError">JSONError</a></dd>
+<dd><a href="exceptions.html#ValueError">exceptions.ValueError</a></dd>
+<dd><a href="exceptions.html#StandardError">exceptions.StandardError</a></dd>
+<dd><a href="exceptions.html#Exception">exceptions.Exception</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="JSONError-pretty_description"><strong>pretty_description</strong></a>(self)</dt></dl>
+
+<hr>
+Methods inherited from <a href="exceptions.html#Exception">exceptions.Exception</a>:<br>
+<dl><dt><a name="JSONError-__getitem__"><strong>__getitem__</strong></a>(...)</dt></dl>
+
+<dl><dt><a name="JSONError-__init__"><strong>__init__</strong></a>(...)</dt></dl>
+
+<dl><dt><a name="JSONError-__str__"><strong>__str__</strong></a>(...)</dt></dl>
+
+</td></tr></table></td></tr></table><p>
 <table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
 <tr bgcolor="#55aa55">
 <td colspan=3 valign=bottom>&nbsp;<br>
@@ -504,17 +468,19 @@ just&nbsp;a&nbsp;single&nbsp;character...the&nbsp;same&nbsp;one.</tt></dd></dl>
     
 <tr><td bgcolor="#55aa55"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
 <td width="100%"><strong>__author__</strong> = 'Deron Meranda &lt;http://deron.meranda.us/&gt;'<br>
-<strong>__credits__</strong> = 'Copyright (c) 2006 Deron E. Meranda &lt;http://dero...treet, Fifth Floor, Boston, MA  02110-1301  USA<font color="#c040c0">\n\n</font>'<br>
-<strong>__date__</strong> = '2006-11-06'<br>
-<strong>__version__</strong> = '1.1'<br>
+<strong>__credits__</strong> = 'Copyright (c) 2006-2007 Deron E. Meranda &lt;http:/...m.  If not, see &lt;http://www.gnu.org/licenses/&gt;.<font color="#c040c0">\n\n</font>'<br>
+<strong>__date__</strong> = '2007-11-08'<br>
+<strong>__version__</strong> = '1.2'<br>
 <strong>content_type</strong> = 'application/json'<br>
 <strong>file_ext</strong> = 'json'<br>
-<strong>hexdigits</strong> = '0123456789abcdefABCDEF'<br>
+<strong>hexdigits</strong> = '0123456789ABCDEFabcdef'<br>
+<strong>i</strong> = 31<br>
 <strong>inf</strong> = inf<br>
 <strong>nan</strong> = nan<br>
 <strong>neginf</strong> = -inf<br>
 <strong>octaldigits</strong> = '01234567'<br>
-<strong>undefined</strong> = demjson.undefined</td></tr></table><p>
+<strong>undefined</strong> = demjson.undefined<br>
+<strong>unsafe_string_chars</strong> = '"<font color="#c040c0">\\\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\x0c\r\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f</font>'</td></tr></table><p>
 <table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
 <tr bgcolor="#7799ee">
 <td colspan=3 valign=bottom>&nbsp;<br>
@@ -528,22 +494,21 @@ just&nbsp;a&nbsp;single&nbsp;character...the&nbsp;same&nbsp;one.</tt></dd></dl>
 <font color="#ffffff" face="helvetica, arial"><big><strong>Credits</strong></big></font></td></tr>
     
 <tr><td bgcolor="#7799ee"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
-<td width="100%">Copyright&nbsp;(c)&nbsp;2006&nbsp;Deron&nbsp;E.&nbsp;Meranda&nbsp;&lt;<a href="http://deron.meranda.us/">http://deron.meranda.us/</a>&gt;<br>
-Licensed&nbsp;under&nbsp;GNU&nbsp;LGPL&nbsp;2.1&nbsp;or&nbsp;later.&nbsp;&nbsp;See&nbsp;&lt;<a href="http://www.fsf.org/">http://www.fsf.org/</a>&gt;.<br>
+<td width="100%">Copyright&nbsp;(c)&nbsp;2006-2007&nbsp;Deron&nbsp;E.&nbsp;Meranda&nbsp;&lt;<a href="http://deron.meranda.us/">http://deron.meranda.us/</a>&gt;<br>
+Licensed&nbsp;under&nbsp;GNU&nbsp;GPL&nbsp;3.0&nbsp;or&nbsp;later.&nbsp;&nbsp;See&nbsp;LICENSE.txt&nbsp;included&nbsp;with&nbsp;this&nbsp;software.<br>
 &nbsp;<br>
-This&nbsp;library&nbsp;is&nbsp;free&nbsp;software;&nbsp;you&nbsp;can&nbsp;redistribute&nbsp;it&nbsp;and/or<br>
-modify&nbsp;it&nbsp;under&nbsp;the&nbsp;terms&nbsp;of&nbsp;the&nbsp;GNU&nbsp;Lesser&nbsp;General&nbsp;Public<br>
-License&nbsp;as&nbsp;published&nbsp;by&nbsp;the&nbsp;Free&nbsp;Software&nbsp;Foundation;&nbsp;either<br>
-version&nbsp;2.1&nbsp;of&nbsp;the&nbsp;License,&nbsp;or&nbsp;(at&nbsp;your&nbsp;option)&nbsp;any&nbsp;later&nbsp;version.<br>
+This&nbsp;program&nbsp;is&nbsp;free&nbsp;software:&nbsp;you&nbsp;can&nbsp;redistribute&nbsp;it&nbsp;and/or&nbsp;modify<br>
+it&nbsp;under&nbsp;the&nbsp;terms&nbsp;of&nbsp;the&nbsp;GNU&nbsp;General&nbsp;Public&nbsp;License&nbsp;as&nbsp;published&nbsp;by<br>
+the&nbsp;Free&nbsp;Software&nbsp;Foundation,&nbsp;either&nbsp;version&nbsp;3&nbsp;of&nbsp;the&nbsp;License,&nbsp;or<br>
+(at&nbsp;your&nbsp;option)&nbsp;any&nbsp;later&nbsp;version.<br>
 &nbsp;<br>
-This&nbsp;library&nbsp;is&nbsp;distributed&nbsp;in&nbsp;the&nbsp;hope&nbsp;that&nbsp;it&nbsp;will&nbsp;be&nbsp;useful,<br>
+This&nbsp;program&nbsp;is&nbsp;distributed&nbsp;in&nbsp;the&nbsp;hope&nbsp;that&nbsp;it&nbsp;will&nbsp;be&nbsp;useful,<br>
 but&nbsp;WITHOUT&nbsp;ANY&nbsp;WARRANTY;&nbsp;without&nbsp;even&nbsp;the&nbsp;implied&nbsp;warranty&nbsp;of<br>
-MERCHANTABILITY&nbsp;or&nbsp;FITNESS&nbsp;FOR&nbsp;A&nbsp;PARTICULAR&nbsp;PURPOSE.&nbsp;&nbsp;See&nbsp;the&nbsp;GNU<br>
-Lesser&nbsp;General&nbsp;Public&nbsp;License&nbsp;for&nbsp;more&nbsp;details.<br>
+MERCHANTABILITY&nbsp;or&nbsp;FITNESS&nbsp;FOR&nbsp;A&nbsp;PARTICULAR&nbsp;PURPOSE.&nbsp;&nbsp;See&nbsp;the<br>
+GNU&nbsp;General&nbsp;Public&nbsp;License&nbsp;for&nbsp;more&nbsp;details.<br>
 &nbsp;<br>
-You&nbsp;should&nbsp;have&nbsp;received&nbsp;a&nbsp;copy&nbsp;of&nbsp;the&nbsp;GNU&nbsp;Lesser&nbsp;General&nbsp;Public<br>
-License&nbsp;along&nbsp;with&nbsp;this&nbsp;library;&nbsp;if&nbsp;not,&nbsp;write&nbsp;to&nbsp;the&nbsp;Free&nbsp;Software<br>
-Foundation,&nbsp;Inc.,&nbsp;51&nbsp;Franklin&nbsp;Street,&nbsp;Fifth&nbsp;Floor,&nbsp;Boston,&nbsp;MA&nbsp;&nbsp;02110-1301&nbsp;&nbsp;USA<br>
+You&nbsp;should&nbsp;have&nbsp;received&nbsp;a&nbsp;copy&nbsp;of&nbsp;the&nbsp;GNU&nbsp;General&nbsp;Public&nbsp;License<br>
+along&nbsp;with&nbsp;this&nbsp;program.&nbsp;&nbsp;If&nbsp;not,&nbsp;see&nbsp;&lt;<a href="http://www.gnu.org/licenses/">http://www.gnu.org/licenses/</a>&gt;.<br>
 &nbsp;<br>
 </td></tr></table>
 </body></html>

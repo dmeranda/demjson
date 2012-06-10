@@ -1,0 +1,31 @@
+Usage: jsonlint [-v] [-s|-S] [-f|-F] [-e codec] inputfile.json ...
+
+The return status will be 0 if the file is legal JSON, or
+non-zero otherwise.  Use -v to see the warning details.
+
+Options are:
+ -v | --verbose    Show details of lint checking
+ -s | --strict     Be strict in what is considered legal JSON
+ -S | --nonstrict  Be loose in what is considered legal JSON
+ -f | --format     Reformat the JSON (if legal) to stdout
+ -F | --format-compactly
+        Reformat the JSON simlar to -f, but do so compactly by
+        removing all unnecessary whitespace
+
+ -e codec | --encoding=codec
+ --input-encoding=codec
+ --output-encoding=codec
+         Set the input and output character encoding codec (e.g.,
+         ascii, utf8, utf-16).  The -e will set both the input and
+         output encodings to the same thing.  If not supplied, the
+         input encoding is guessed according to the JSON
+         specification.  The output encoding defaults to UTF-8, and is
+         used when reformatting (via the -f or -F options).
+
+When reformatting, all members of objects (associative arrays) are
+always output in lexigraphical sort order.  The default output codec
+is UTF-8, unless the -e option is provided.  Any Unicode characters
+will be output as literal characters if the encoding permits,
+otherwise they will be \u-escaped.  You can use "-e ascii" to force
+all Unicode characters to be escaped.
+

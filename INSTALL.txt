@@ -1,15 +1,29 @@
-To install, type:
+== Basic installation
 
-    python setup.py install
-
-Optionally you can also just copy the "demjson.py" file into
-your own project's directory.
-
-This software is also published in the Python Cheeseshop.  So
-you may be able to install it by using:
+This software is published in the Python Package Index (PYPI), formerly
+known as the Python Cheeseshop.  If you have the setuptools installed,
+you may be able to install this module with just:
 
    easy_install demjson
 
+Otherwise, you can install it by downloading the distrubtion and
+unpacking it in some temporary directory.  Then inside that
+directory, type:
+
+    python setup.py install
+
+Optionally, for a minimal installation, you can also just copy the
+"demjson.py" file into your own project's directory.
+
+
+== jsonlint command
+
+You can optionally install the script jsonlint by copying it to
+any directory on your PATH, such as into /usr/local/bin under
+Unix/Linux.  Make sure the script is set as being executable.
+
+
+== Running self tests
 
 Self tests are included which conform to the Python unittest
 framework.  To run these tests, do

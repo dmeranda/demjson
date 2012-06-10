@@ -114,50 +114,84 @@ r""" A JSON data encoder and decoder.
 """
 
 __author__ = "Deron Meranda <http://deron.meranda.us/>"
-__date__ = "2006-11-06"
-__version__ = "1.1"
-__credits__ = """Copyright (c) 2006 Deron E. Meranda <http://deron.meranda.us/>
-Licensed under GNU LGPL 2.1 or later.  See <http://www.fsf.org/>.
+__date__ = "2007-11-08"
+__version__ = "1.2"
+__credits__ = """Copyright (c) 2006-2007 Deron E. Meranda <http://deron.meranda.us/>
+Licensed under GNU GPL 3.0 or later.  See LICENSE.txt included with this software.
 
-This library is free software; you can redistribute it and/or
-modify it under the terms of the GNU Lesser General Public
-License as published by the Free Software Foundation; either
-version 2.1 of the License, or (at your option) any later version.
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-This library is distributed in the hope that it will be useful,
+This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-Lesser General Public License for more details.
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
 
-You should have received a copy of the GNU Lesser General Public
-License along with this library; if not, write to the Free Software
-Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
 # ------------------------------
+# useful global constants
+
+content_type = 'application/json'
+file_ext = 'json'
+hexdigits = '0123456789ABCDEFabcdef'
+octaldigits = '01234567'
+
+
+# ----------------------------------------------------------------------
+# The undefined value.
+#
+# ECMAScript has an undefined value (similar to yet distinct from null).
+# Neither Python or strict JSON have support undefined, but to allow
+# JavaScript behavior we must simulate it.
+
+class _undefined_class(object):
+    """Represents the ECMAScript 'undefined' value."""
+    __slots__ = []
+    def __repr__(self):
+        return self.__module__ + '.undefined'
+    def __str__(self):
+        return 'undefined'
+    def __nonzero__(self):
+        return False
+undefined = _undefined_class()
+del _undefined_class
+
+
+# ----------------------------------------------------------------------
 # Non-Numbers: NaN, Infinity, -Infinity
 #
-# ECMAScript has official support for non-number floats.  Python does
-# not.  So we must try to add them into Python, which is unfortunately
-# a bit of black magic.
+# ECMAScript has official support for non-number floats, although
+# strict JSON does not.  Python doesn't either.  So to support the
+# full JavaScript behavior we must try to add them into Python, which
+# is unfortunately a bit of black magic.  If our python implementation
+# happens to be built on top of IEEE 754 we can probably trick python
+# into using real floats.  Otherwise we must simulate it with classes.
 
 def _nonnumber_float_constants():
     """Try to return the Nan, Infinity, and -Infinity float values.
     
-    This is unnecessarily complex because there is no standard platform-
-    independent way to do this in Python.  We try various strategies
-    from the best to the worst.
+    This is unnecessarily complex because there is no standard
+    platform- independent way to do this in Python as the language
+    (opposed to some implementation of it) doesn't discuss
+    non-numbers.  We try various strategies from the best to the
+    worst.
     
-    If this Python interpreter correctly supports the IEEE 754 floating
-    point standard then the returned values will be instances of the
-    'float' type.  Otherwise a class object is returned which will
-    attempt to simulate the correct behavior as much as possible.
+    If this Python interpreter uses the IEEE 754 floating point
+    standard then the returned values will probably be real instances
+    of the 'float' type.  Otherwise a custom class object is returned
+    which will attempt to simulate the correct behavior as much as
+    possible.
 
     """
     try:
         # First, try (mostly portable) float constructor.  Works under
-        # Linux x86 and some Unices.
+        # Linux x86 (gcc) and some Unices.
         nan = float('nan')
         inf = float('inf')
         neginf = float('-inf')
@@ -188,7 +222,7 @@ def _nonnumber_float_constants():
                 neginf = - inf
                 if check != -3.14159e-11:
                     raise ValueError('Unpacking raw IEEE 754 floats does not work')
-            except:
+            except ValueError:
                 # Punt, make some fake classes to simulate.  These are
                 # not perfect though.  For instance nan * 1.0 == nan,
                 # as expected, but 1.0 * nan == 0.0, which is wrong.
@@ -387,8 +421,55 @@ def _nonnumber_float_constants():
 nan, inf, neginf = _nonnumber_float_constants()
 del _nonnumber_float_constants
 
-# ------------------------------
+
+# ----------------------------------------------------------------------
+# String processing helpers
+
+unsafe_string_chars = '"\\' + ''.join([chr(i) for i in range(0x20)])
+def skipstringsafe( s, start=0, end=None ):
+    i = start
+    #if end is None:
+    #    end = len(s)
+    while i < end and s[i] not in unsafe_string_chars:
+        #c = s[i]
+        #if c in unsafe_string_chars:
+        #    break
+        i += 1
+    return i
+def skipstringsafe_slow( s, start=0, end=None ):
+    i = start
+    if end is None:
+        end = len(s)
+    while i < end:
+        c = s[i]
+        if c == '"' or c == '\\' or ord(c) <= 0x1f:
+            break
+        i += 1
+    return i
+
+def extend_list_with_sep( orig_seq, extension_seq, sepchar='' ):
+    if not sepchar:
+        orig_seq.extend( extension_seq )
+    else:
+        for i, x in enumerate(extension_seq):
+            if i > 0:
+                orig_seq.append( sepchar )
+            orig_seq.append( x )
+
+def extend_and_flatten_list_with_sep( orig_seq, extension_seq, separator='' ):
+    for i, part in enumerate(extension_seq):
+        if i > 0 and separator:
+            orig_seq.append( separator )
+        orig_seq.extend( part )
+
+
+# ----------------------------------------------------------------------
 # Unicode helpers
+#
+# JSON requires that all JSON implementations must support the UTF-32
+# encoding (as well as UTF-8 and UTF-16).  But earlier versions of
+# Python did not provide a UTF-32 codec.  So we must implement UTF-32
+# ourselves in case we need it.
 
 def utf32le_encode( obj, errors='strict' ):
     """Encodes a Unicode string into a UTF-32LE encoded byte string."""
@@ -398,9 +479,11 @@ def utf32le_encode( obj, errors='strict' ):
     except ImportError:
         import StringIO as sio
     f = sio.StringIO()
+    write = f.write
+    pack = struct.pack
     for c in obj:
         n = ord(c)
-        if 0xD800 <= n <= 0xDFFF:
+        if 0xD800 <= n <= 0xDFFF: # surrogate codepoints are prohibited by UTF-32
             if errors == 'ignore':
                 continue
             elif errors == 'replace':
@@ -408,9 +491,9 @@ def utf32le_encode( obj, errors='strict' ):
             else:
                 cname = 'U+%04X'%n
                 raise UnicodeError('UTF-32 can not encode surrogate characters',cname)
-        e = struct.pack('<L', n)
-        f.write(e)
+        write( pack('<L', n) )
     return f.getvalue()
+
 
 def utf32be_encode( obj, errors='strict' ):
     """Encodes a Unicode string into a UTF-32BE encoded byte string."""
@@ -420,9 +503,11 @@ def utf32be_encode( obj, errors='strict' ):
     except ImportError:
         import StringIO as sio
     f = sio.StringIO()
+    write = f.write
+    pack = struct.pack
     for c in obj:
         n = ord(c)
-        if 0xD800 <= n <= 0xDFFF:
+        if 0xD800 <= n <= 0xDFFF: # surrogate codepoints are prohibited by UTF-32
             if errors == 'ignore':
                 continue
             elif errors == 'replace':
@@ -430,35 +515,39 @@ def utf32be_encode( obj, errors='strict' ):
             else:
                 cname = 'U+%04X'%n
                 raise UnicodeError('UTF-32 can not encode surrogate characters',cname)
-        e = struct.pack('>L', n)
-        f.write(e)
+        write( pack('>L', n) )
     return f.getvalue()
+
 
 def utf32le_decode( obj, errors='strict' ):
     """Decodes a UTF-32LE byte string into a Unicode string."""
     if len(obj) % 4 != 0:
         raise UnicodeError('UTF-32 decode error, data length not a multiple of 4 bytes')
     import struct
+    unpack = struct.unpack
     chars = []
     i = 0
     for i in range(0, len(obj), 4):
         seq = obj[i:i+4]
-        n = struct.unpack('<L',seq)[0]
+        n = unpack('<L',seq)[0]
         chars.append( unichr(n) )
     return u''.join( chars )
+
 
 def utf32be_decode( obj, errors='strict' ):
     """Decodes a UTF-32BE byte string into a Unicode string."""
     if len(obj) % 4 != 0:
         raise UnicodeError('UTF-32 decode error, data length not a multiple of 4 bytes')
     import struct
+    unpack = struct.unpack
     chars = []
     i = 0
     for i in range(0, len(obj), 4):
         seq = obj[i:i+4]
-        n = struct.unpack('>L',seq)[0]
+        n = unpack('>L',seq)[0]
         chars.append( unichr(n) )
     return u''.join( chars )
+
 
 def auto_unicode_decode( s ):
     """Takes a string and tries to convert it to a Unicode string.
@@ -470,10 +559,10 @@ def auto_unicode_decode( s ):
     input is encoded in UTF-8 (the default for JSON).
 
     """
-    if isinstance(s,unicode):
+    if isinstance(s, unicode):
         return s
     if len(s) < 4:
-        return s
+        return s.decode('utf8')  # not enough bytes, assume default of utf-8
     # Look for BOM marker
     import codecs
     bom2 = s[:2]
@@ -528,17 +617,17 @@ def auto_unicode_decode( s ):
 
 
 def surrogate_pair_as_unicode( c1, c2 ):
-    """Takes a pair of unicode characters and returns the equivalent unicode character.
+    """Takes a pair of unicode surrogates and returns the equivalent unicode character.
 
     The input pair must be a surrogate pair, with c1 in the range
     U+D800 to U+DBFF and c2 in the range U+DC00 to U+DFFF.
 
     """
     n1, n2 = ord(c1), ord(c2)
-    if n1 < 0xd800 or n1 > 0xdbff or n2 < 0xdc00 or n2 > 0xdfff:
+    if n1 < 0xD800 or n1 > 0xDBFF or n2 < 0xDC00 or n2 > 0xDFFF:
         raise JSONDecodeError('illegal Unicode surrogate pair',(c1,c2))
-    a = n1 - 0xd800
-    b = n2 - 0xdc00
+    a = n1 - 0xD800
+    b = n2 - 0xDC00
     v = (a << 10) | b
     v += 0x10000
     return unichr(v)
@@ -566,42 +655,29 @@ def unicode_as_surrogate_pair( c ):
     return (unichr(w1), unichr(w2))
 
 
-# ------------------------------
-# Other globals
-
-content_type = 'application/json'
-file_ext = 'json'
-hexdigits = '0123456789abcdefABCDEF'
-octaldigits = '01234567'
-
-# ECMAScript has an undefined type, Python does not.  So we must
-# make a type to represent it.
-
-class _undefined_class(object):
-    """Represents the ECMAScript 'undefined' value."""
-    __slots__ = []
-    def __repr__(self):
-        return self.__module__ + '.undefined'
-    def __str__(self):
-        return 'undefined'
-    def __nonzero__(self):
-        return False
-undefined = _undefined_class()
-del _undefined_class
-
+# ----------------------------------------------------------------------
+# Type identification
 
 def isnumbertype( obj ):
     """Is the object of a Python number type (excluding complex)?"""
     return isinstance(obj, (int,long,float)) \
+           and not isinstance(obj, bool) \
            or obj is nan or obj is inf or obj is neginf
+
 
 def isstringtype( obj ):
     """Is the object of a Python string type?"""
+    if isinstance(obj, basestring):
+        return True
+    # Must also check for some other pseudo-string types
     import types, UserString
-    return isinstance(obj, basestring) \
-           or isinstance(obj, types.StringTypes) \
+    return isinstance(obj, types.StringTypes) \
            or isinstance(obj, UserString.UserString) \
            or isinstance(obj, UserString.MutableString)
+
+
+# ----------------------------------------------------------------------
+# Numeric helpers
 
 def decode_hex( hexstring ):
     """Decodes a hexadecimal string into it's integer value."""
@@ -618,7 +694,8 @@ def decode_hex( hexstring ):
             d = ord(c) - ord('A') + 10
         else:
             raise JSONDecodeError('not a hexadecimal number',hexstring)
-        n = (n << 4) | d
+        # Could use ((n << 4 ) | d), but python 2.3 issues a FutureWarning.
+        n = (n * 16) + d
     return n
 
 
@@ -630,20 +707,41 @@ def decode_octal( octalstring ):
             d = ord(c) - ord('0')
         else:
             raise JSONDecodeError('not an octal number',octalstring)
-        n = (n << 3) | d
+        # Could use ((n << 3 ) | d), but python 2.3 issues a FutureWarning.
+        n = (n * 8) + d
     return n
 
 
-class JSONDecodeError(ValueError):
+# ----------------------------------------------------------------------
+# Exception classes.
+
+class JSONError(ValueError):
+    """Our base class for all JSON-related errors.
+
+    """
+    def pretty_description(self):
+        err = self.args[0]
+        if len(self.args) > 1:
+            err += ': '
+            for anum, a in enumerate(self.args[1:]):
+                if anum > 1:
+                    err += ', '
+                astr = repr(a)
+                if len(astr) > 20:
+                    astr = astr[:20] + '...'
+                err += astr
+        return err
+
+class JSONDecodeError(JSONError):
     """An exception class raised when a JSON decoding error (syntax error) occurs."""
 
 
-class JSONEncodeError(ValueError):
+class JSONEncodeError(JSONError):
     """An exception class raised when a python object can not be encoded as a JSON string."""
 
 
-# ------------------------------
-# The main JSON encoder/decoder class
+#----------------------------------------------------------------------
+# The main JSON encoder/decoder class.
 
 class JSON(object):
     """An encoder/decoder for JSON data streams.
@@ -665,6 +763,41 @@ class JSON(object):
     or prevent() methods to adjust these.
     
     """
+    _escapes_json = { # character escapes in JSON
+        '"': '"',
+        '/': '/',
+        '\\': '\\',
+        'b': '\b',
+        'f': '\f',
+        'n': '\n',
+        'r': '\r',
+        't': '\t',
+        }
+
+    _escapes_js = { # character escapes in Javascript
+        '"': '"',
+        '\'': '\'',
+        '\\': '\\',
+        'b': '\b',
+        'f': '\f',
+        'n': '\n',
+        'r': '\r',
+        't': '\t',
+        'v': '\v',
+        '0': '\x00'
+        }
+
+    # Following is a reverse mapping of escape characters, used when we
+    # output JSON.  Only those escapes which are always safe (e.g., in JSON)
+    # are here.  It won't hurt if we leave questionable ones out.
+    _rev_escapes = {'\n': '\\n',
+                    '\t': '\\t',
+                    '\b': '\\b',
+                    '\r': '\\r',
+                    '\f': '\\f',
+                    '"': '\\"',
+                    '\\': '\\\\'}
+
     def __init__(self, strict=False, compactly=True, escape_unicode=True):
         """Creates a JSON encoder/decoder object.
         
@@ -680,28 +813,44 @@ class JSON(object):
         
         If 'escape_unicode' is set to True, then all non-ASCII characters
         will be represented as a unicode escape sequence; if False then
-        the actual real unicode character will be inserted.
+        the actual real unicode character will be inserted if possible.
 
         The 'escape_unicode' can also be a function, which when called
         with a single argument of a unicode character will return True
         if the character should be escaped or False if it should not.
         
-        If you wish to extend the encoding to ba able to handle additional
-        types, you should subclass this class and override the
-        encode_default() method.
+        If you wish to extend the encoding to ba able to handle
+        additional types, you should subclass this class and override
+        the encode_default() method.
         
         """
         import sys
         self._set_strictness(strict)
         self._encode_compactly = compactly
-        self._encode_unicode_as_escapes = escape_unicode
+        try:
+            # see if we were passed a predicate function
+            b = escape_unicode(u'A')
+            self._encode_unicode_as_escapes = escape_unicode
+        except (ValueError, NameError, TypeError):
+            # Just set to True or False.  We could use lambda x:True
+            # to make it more consistent (always a function), but it
+            # will be too slow, so we'll make explicit tests later.
+            self._encode_unicode_as_escapes = bool(escape_unicode)
         self._sort_dictionary_keys = True
+
+        # The following is a boolean map of the first 256 characters
+        # which will quickly tell us which of those characters never
+        # need to be escaped.
+
+        self._asciiencodable = [32 <= c < 128 and not self._rev_escapes.has_key(chr(c))
+                              for c in range(0,255)]
 
     def _set_strictness(self, strict):
         """Changes the strictness behavior.
 
         Pass True to be very strict about JSON syntax, or False to be looser.
         """
+        self._allow_any_type_at_start = not strict
         self._allow_all_numeric_signs = not strict
         self._allow_comments = not strict
         self._allow_control_char_in_string = not strict
@@ -858,11 +1007,11 @@ class JSON(object):
             return 'true'
         return 'false'
 
-    def decode_number(self, s, i=0):
+    def decode_number(self, s, i=0, imax=None):
         """Intermediate-level decoder for JSON numeric literals.
 
         Takes a string and a starting index, and returns a Python
-        numeric type and the index of the next unparsed character.
+        suitable numeric type and the index of the next unparsed character.
 
         The returned numeric type can be either of a Python int,
         long, or float.  In addition some special non-numbers may
@@ -872,15 +1021,17 @@ class JSON(object):
         Ref. ECMAScript section 8.5.
 
         """
+        if imax is None:
+            imax = len(s)
         # Detect initial sign character(s)
         if not self._allow_all_numeric_signs:
-            if s[i] == '+' or (s[i] == '-' and i+1 < len(s) and \
+            if s[i] == '+' or (s[i] == '-' and i+1 < imax and \
                                s[i+1] in '+-'):
                 raise JSONDecodeError('numbers in strict JSON may only have a single "-" as a sign prefix',s[i:])
         sign = +1
         j = i  # j will point after the sign prefix
-        while j < len(s) and s[j] in '+-':
-            sign *= {'+':+1, '-':-1}.get( s[j] )
+        while j < imax and s[j] in '+-':
+            if s[j] == '-': sign = sign * -1
             j += 1
         # Check for ECMAScript symbolic non-numbers
         if s[j:j+3] == 'NaN':
@@ -899,7 +1050,7 @@ class JSON(object):
         elif s[j:j+2] in ('0x','0X'):
             if self._allow_hex_numbers:
                 k = j+2
-                while k < len(s) and s[k] in hexdigits:
+                while k < imax and s[k] in hexdigits:
                     k += 1
                 n = sign * decode_hex( s[j+2:k] )
                 return n, k
@@ -907,9 +1058,9 @@ class JSON(object):
                 raise JSONDecodeError('hexadecimal literals are not allowed in strict JSON',s[i:])
         else:
             # Decimal (or octal) number, find end of number
-            k = j
-            could_be_octal = ( k+1 < len(s) and s[k] == '0' )
-            while k < len(s) and (s[k].isdigit() or s[k] in '.+-eE'):
+            k = j   # will point to end of digit sequence
+            could_be_octal = ( k+1 < imax and s[k] == '0' )
+            while k < imax and (s[k].isdigit() or s[k] in '.+-eE'):
                 if s[k] not in octaldigits:
                     could_be_octal = False
                 k += 1
@@ -919,7 +1070,7 @@ class JSON(object):
             # is not enabled (the ECMAScipt standard) then just do
             # nothing and treat the string as a decimal number.
             if could_be_octal and self._allow_octal_numbers:
-                n = decode_octal( decimal )
+                n = sign * decode_octal( decimal )
                 return n, k
 
             # A decimal number.  Do a quick check on JSON syntax
@@ -960,6 +1111,8 @@ class JSON(object):
         ECMAScript equivalent type.
         
         """
+        if isinstance(n, (int,long)):
+            return str(n)
         global nan, inf, neginf
         if n is nan:
             return 'NaN'
@@ -967,7 +1120,7 @@ class JSON(object):
             return 'Infinity'
         elif n is neginf:
             return '-Infinity'
-        if isinstance(n, float):
+        elif isinstance(n, float):
             # Check for non-numbers.
             # In python nan == inf == -inf, so must use repr() to distinguish
             reprn = repr(n).lower()
@@ -977,44 +1130,11 @@ class JSON(object):
                 return 'Infinity'
             elif 'nan' in reprn or n is nan:
                 return 'NaN'
-
-        if isinstance(n,int) or isinstance(n,long):
-            return '%d' % n
+            return repr(n)
         else:
-            return '%g' % n
+            raise TypeError('encode_number expected an integral or float number type',type(n))
 
-    _escapes_json = {
-        '"': '"',
-        '/': '/',
-        '\\': '\\',
-        'b': '\b',
-        'f': '\f',
-        'n': '\n',
-        'r': '\r',
-        't': '\t',
-        }
-    _escapes_js = {
-        '"': '"',
-        '\'': '\'',
-        '\\': '\\',
-        'b': '\b',
-        'f': '\f',
-        'n': '\n',
-        'r': '\r',
-        't': '\t',
-        'v': '\v',
-        '0': '\x00'
-        }
-
-    _rev_escapes = {'\n':'\\n',
-                    '\t':'\\t',
-                    '\b':'\\b',
-                    '\r':'\\r',
-                    '\f':'\\f',
-                    '"':'\\"',
-                    '\\':'\\\\'}
-
-    def decode_string(self, s, i=0):
+    def decode_string(self, s, i=0, imax=None):
         """Intermediate-level decoder for JSON string literals.
 
         Takes a string and a starting index, and returns a Python
@@ -1022,8 +1142,9 @@ class JSON(object):
         character.
 
         """
-
-        if len(s) < i+2 or s[i] not in '"\'':
+        if imax is None:
+            imax = len(s)
+        if imax < i+2 or s[i] not in '"\'':
             raise JSONDecodeError('string literal must be properly quoted',s[i:])
         closer = s[i]
         if closer == '\'' and not self._allow_single_quoted_strings:
@@ -1033,12 +1154,14 @@ class JSON(object):
             escapes = self._escapes_js
         else:
             escapes = self._escapes_json
+        ccallowed = self._allow_control_char_in_string
         chunks = []
+        _append = chunks.append
         done = False
         high_surrogate = None
-        while i < len(s):
+        while i < imax:
             c = s[i]
-            if high_surrogate and (i+1 >= len(s) or s[i:i+2] != '\\u'):
+            if high_surrogate and (i+1 >= imax or s[i:i+2] != '\\u'):
                 raise JSONDecodeError('High unicode surrogate must be followed by a low surrogate',s[i:])
             if c == closer:
                 i += 1 # skip end quote
@@ -1046,7 +1169,7 @@ class JSON(object):
                 break
             elif c == '\\':
                 i += 1
-                if i >= len(s):
+                if i >= imax:
                     raise JSONDecodeError('escape in string literal is incomplete',s[i-1:])
                 c = s[i]
 
@@ -1058,18 +1181,18 @@ class JSON(object):
                     else:
                         maxdigits = 2
                     for k in range(i, i+maxdigits+1):
-                        if k >= len(s) or s[k] not in octaldigits:
+                        if k >= imax or s[k] not in octaldigits:
                             break
                     n = decode_octal(s[i:k])
                     if n < 128:
-                        chunks.append( chr(n) )
+                        _append( chr(n) )
                     else:
-                        chunks.append( unichr(n) )
+                        _append( unichr(n) )
                     i = k
                     continue
 
                 if escapes.has_key(c):
-                    chunks.append(escapes[c])
+                    _append(escapes[c])
                     i += 1
                 elif c == 'u' or c == 'x':
                     i += 1
@@ -1079,48 +1202,52 @@ class JSON(object):
                         if not self._allow_js_string_escapes:
                             raise JSONDecodeError(r'string literals may not use the \x hex-escape in strict JSON',s[i-1:])
                         digits = 2
-                    if i+digits >= len(s):
+                    if i+digits >= imax:
                         raise JSONDecodeError('numeric character escape sequence is truncated',s[i-1:])
                     n = decode_hex( s[i:i+digits] )
                     if high_surrogate:
-                        chunks.append( surrogate_pair_as_unicode( high_surrogate, unichr(n) ) )
+                        _append( surrogate_pair_as_unicode( high_surrogate, unichr(n) ) )
                         high_surrogate = None
                     elif n < 128:
-                        chunks.append( chr(n) )
+                        _append( chr(n) )
                     elif 0xd800 <= n <= 0xdbff: # high surrogate
-                        if len(s) < i + digits + 2 or s[i+digits] != '\\' or s[i+digits+1] != 'u':
+                        if imax < i + digits + 2 or s[i+digits] != '\\' or s[i+digits+1] != 'u':
                             raise JSONDecodeError('High unicode surrogate must be followed by a low surrogate',s[i-2:])
                         high_surrogate = unichr(n)  # remember until we get to the low surrogate
                     elif 0xdc00 <= n <= 0xdfff: # low surrogate
                         raise JSONDecodeError('Low unicode surrogate must be proceeded by a high surrogate',s[i-2:])
                     else:
-                        chunks.append( unichr(n) )
+                        _append( unichr(n) )
                     i += digits
                 else:
                     if self._allow_nonescape_characters:
-                        chunks.append( c )
+                        _append( c )
                         i += 1
                     else:
                         raise JSONDecodeError('unsupported escape code in JSON string literal',s[i-1:])
-            else:
+            else: # a normal character (non-escape)
                 j = i
-                while i < len(s) and (s[i] != closer and s[i] != '\\'):
+                #i = skipstringsafe( s, i+1, imax )
+                i += 1
+                while i<imax and s[i] not in unsafe_string_chars:
+                    i+=1
+                if False: #while i < imax and (s[i] != closer and s[i] != '\\'):
                     c = s[i]
                     if self.islineterm(c):
                         raise JSONDecodeError('line terminator characters must be escaped inside string literals',s[i:])
-                    elif ord(c) <= 0x1f and not self._allow_control_char_in_string:
+                    elif ord(c) <= 0x1f and not ccallowed:
                         # If unicodedata.category(c) == "Cc", JavaScript allows, JSON does not
                         raise JSONDecodeError('control characters must be escaped inside string JSON literals',s[i:])
                     i += 1
-                chunks.append(s[j:i])
+                _append(s[j:i])
         if not done:
             raise JSONDecodeError('string literal is not terminated with a quotation mark',s)
-        s = ''.join(chunks)
+        s = ''.join( chunks )
         # Try to convert unicode strings back to ascii strings if possible
-        try:
-            s = s.encode('ascii')
-        except UnicodeEncodeError:
-            pass
+        #try:
+        #    s = s.encode('ascii')
+        #except UnicodeEncodeError:
+        #   pass
         return s, i
 
     def encode_string(self, s):
@@ -1134,62 +1261,79 @@ class JSON(object):
             def tochar(c):
                 return c.data
         else:
-            def tochar(c):
-                return c
+            # Could use "lambda c:c", but that is too slow.  So we set to None
+            # and use an explicit if test inside the loop.
+            tochar = None
         
         chunks = []
         chunks.append('"')
+        revesc = self._rev_escapes
+        asciiencodable = self._asciiencodable
+        encunicode = self._encode_unicode_as_escapes
         i = 0
-        while i < len(s):
-            c = tochar( s[i] )
-            if self._rev_escapes.has_key(c):
-                chunks.append(self._rev_escapes[c])
+        imax = len(s)
+        while i < imax:
+            if tochar:
+                c = tochar(s[i])
+            else:
+                c = s[i]
+            cord = ord(c)
+            if cord < 256 and asciiencodable[cord] and isinstance(encunicode, bool):
+                # Contiguous runs of plain old printable ASCII can be copied
+                # directly to the JSON output without worry (unless the user
+                # has supplied a custom is-encodable function).
+                j = i
                 i += 1
-            elif ord(c) >= 32 and ord(c) < 128:
-                # contiguous runs of plain old printable ASCII
-                j=i
-                while i < len(s):
-                    c = tochar( s[i] )
-                    if ord(c) >= 32 and ord(c) <= 128 and not self._rev_escapes.has_key(c):
+                while i < imax:
+                    if tochar:
+                        c = tochar(s[i])
+                    else:
+                        c = s[i]
+                    cord = ord(c)
+                    if cord < 256 and asciiencodable[cord]:
                         i += 1
                     else:
                         break
                 chunks.append( unicode(s[j:i]) )
-            elif ord(c) <= 0x1f:
-                # Always unicode escape control characters
-                chunks.append(r'\u%04x' % ord(c))
+            elif revesc.has_key(c):
+                # Has a shortcut escape sequence, like "\n"
+                chunks.append(revesc[c])
                 i += 1
-            elif 0xD800 <= ord(c) <= 0xDFFF:
+            elif cord <= 0x1F:
+                # Always unicode escape ASCII-control characters
+                chunks.append(r'\u%04x' % cord)
+                i += 1
+            elif 0xD800 <= cord <= 0xDFFF:
                 # A raw surrogate character!  This should never happen
                 # and there's no way to include it in the JSON output.
                 # So all we can do is complain.
-                cname = 'U+%04X' % ord(c)
+                cname = 'U+%04X' % cord
                 raise JSONEncodeError('can not include or escape a Unicode surrogate character',cname)
-            elif ord(c) <= 0xffff:
+            elif cord <= 0xFFFF:
                 # Other BMP Unicode character
-                try:
-                    do_esc = self._encode_unicode_as_escapes( c )
-                except:
-                    do_esc = self._encode_unicode_as_escapes
-                if do_esc:
-                    chunks.append(r'\u%04x' % ord(c))
+                if isinstance(encunicode, bool):
+                    doesc = encunicode
+                else:
+                    doesc = encunicode( c )
+                if doesc:
+                    chunks.append(r'\u%04x' % cord)
                 else:
                     chunks.append( c )
                 i += 1
             else: # ord(c) >= 0x10000
                 # Non-BMP Unicode
-                try:
-                    do_esc = self._encode_unicode_as_escapes( c )
-                except:
-                    do_esc = self._encode_unicode_as_escapes
-                if do_esc:
+                if isinstance(encunicode, bool):
+                    doesc = encunicode
+                else:
+                    doesc = encunicode( c )
+                if doesc:
                     for surrogate in unicode_as_surrogate_pair(c):
                         chunks.append(r'\u%04x' % ord(surrogate))
                 else:
                     chunks.append( c )
                 i += 1
         chunks.append('"')
-        return ''.join(chunks)
+        return ''.join( chunks )
 
     def skip_comment(self, txt, i=0):
         """Skips an ECMAScript comment, either // or /* style.
@@ -1225,8 +1369,20 @@ class JSON(object):
                 raise JSONDecodeError('comment was never terminated',txt[istart:])
         return txt[istart:j], j
 
-    def skipws(self, txt, i=0, skip_comments=True):
-        """Skips all whitespace.
+    def skipws(self, txt, i=0, imax=None, skip_comments=True):
+        """Skips whitespace.
+        """
+        if not self._allow_comments and not self._allow_unicode_whitespace:
+            if imax is None:
+                imax = len(txt)
+            while i < imax and txt[i] in ' \r\n\t':
+                i += 1
+            return i
+        else:
+            return self.skipws_any(txt, i, imax, skip_comments)
+
+    def skipws_any(self, txt, i=0, imax=None, skip_comments=True):
+        """Skips all whitespace, including comments and unicode whitespace
 
         Takes a string and a starting index, and returns the index of the
         next non-whitespace character.
@@ -1235,26 +1391,29 @@ class JSON(object):
         comments will be skipped over just like whitespace.
 
         """
-        while i < len(txt):
+        if imax is None:
+            imax = len(txt)
+        while i < imax:
             if txt[i] == '/':
                 cmt, i = self.skip_comment(txt, i)
-            if i < len(txt) and self.isws(txt[i]):
+            if i < imax and self.isws(txt[i]):
                 i += 1
             else:
                 break
         return i
 
-    def decode_composite(self, txt, i=0):
+    def decode_composite(self, txt, i=0, imax=None):
         """Intermediate-level JSON decoder for composite literal types (array and object).
 
         Takes text and a starting index, and returns either a Python list or
         dictionary and the index of the next unparsed character.
 
         """
-
-        i = self.skipws(txt, i)
+        if imax is None:
+            imax = len(txt)
+        i = self.skipws(txt, i, imax)
         starti = i
-        if i >= len(txt) or txt[i] not in '{[':
+        if i >= imax or txt[i] not in '{[':
             raise JSONDecodeError('composite object must start with "[" or "{"',txt[i:])
         if txt[i] == '[':
             isdict = False
@@ -1265,18 +1424,18 @@ class JSON(object):
             closer = '}'
             obj = {}
         i += 1 # skip opener
-        i = self.skipws(txt, i)
+        i = self.skipws(txt, i, imax)
 
-        if i < len(txt) and txt[i] == closer:
+        if i < imax and txt[i] == closer:
             # empty composite
             i += 1
             done = True
         else:
             saw_value = False   # set to false at beginning and after commas
             done = False
-            while i < len(txt):
-                i = self.skipws(txt, i)
-                if i < len(txt) and (txt[i] == ',' or txt[i] == closer):
+            while i < imax:
+                i = self.skipws(txt, i, imax)
+                if i < imax and (txt[i] == ',' or txt[i] == closer):
                     c = txt[i]
                     i += 1
                     if c == ',':
@@ -1302,13 +1461,17 @@ class JSON(object):
                         done = True
                         break
 
+                # Decode the item
                 if isdict and self._allow_nonstring_keys:
                     r = self.decodeobj(txt, i, identifier_as_string=True)
                 else:
                     r = self.decodeobj(txt, i, identifier_as_string=False)
                 if r:
+                    if saw_value:
+                        # two values without a separating comma
+                        raise JSONDecodeError('values must be separated by a comma', txt[i:r[1]])
                     saw_value = True
-                    i = self.skipws(txt, r[1])
+                    i = self.skipws(txt, r[1], imax)
                     if isdict:
                         key = r[0]  # Ref 11.1.5
                         if not isstringtype(key):
@@ -1317,13 +1480,13 @@ class JSON(object):
                                     raise JSONDecodeError('strict JSON only permits string literals as object properties (dictionary keys)',txt[starti:])
                             else:
                                 raise JSONDecodeError('object properties (dictionary keys) must be either string literals or numbers',txt[starti:])
-                        if i >= len(txt) or txt[i] != ':':
+                        if i >= imax or txt[i] != ':':
                             raise JSONDecodeError('object property (dictionary key) has no value, expected ":"',txt[starti:])
                         i += 1
-                        i = self.skipws(txt, i)
+                        i = self.skipws(txt, i, imax)
                         rval = self.decodeobj(txt, i)
                         if rval:
-                            i = self.skipws(txt, rval[1])
+                            i = self.skipws(txt, rval[1], imax)
                             obj[key] = rval[0]
                         else:
                             raise JSONDecodeError('object property (dictionary key) has no value',txt[starti:])
@@ -1344,7 +1507,7 @@ class JSON(object):
                 raise JSONDecodeError('array literal (list) is not terminated',txt[starti:])
         return obj, i
         
-    def decodeobj(self, txt, i=0, identifier_as_string=False):
+    def decodeobj(self, txt, i=0, imax=None, identifier_as_string=False, only_object_or_array=False):
         """Intermediate-level JSON decoder.
 
         Takes a string and a starting index, and returns a two-tuple consting
@@ -1354,20 +1517,25 @@ class JSON(object):
         returned instead of a tuple.
 
         """
-
+        if imax is None:
+            imax = len(txt)
         obj = None
-        if i >= len(txt):
-            return None
-        i = self.skipws(txt, i)
-        if txt[i] == '[' or txt[i] == '{':
-            obj, i = self.decode_composite(txt, i)
-        elif txt[i] == '"' or txt[i] == '\'':
-            obj, i = self.decode_string(txt, i)
-        elif txt[i].isdigit() or txt[i] in '.+-':
-            obj, i = self.decode_number(txt, i)
-        elif txt[i].isalpha():
+        i = self.skipws(txt, i, imax)
+        if i >= imax:
+            raise JSONDecodeError('Unexpected end of input')
+        c = txt[i]
+
+        if c == '[' or c == '{':
+            obj, i = self.decode_composite(txt, i, imax)
+        elif only_object_or_array:
+            raise JSONDecodeError('JSON document must start with an object or array type only', txt[i:i+20])
+        elif c == '"' or c == '\'':
+            obj, i = self.decode_string(txt, i, imax)
+        elif c.isdigit() or c in '.+-':
+            obj, i = self.decode_number(txt, i, imax)
+        elif c.isalpha():
             j = i
-            while j < len(txt) and (txt[j].isalnum() or txt[j]=='_'):
+            while j < imax and (txt[j].isalnum() or txt[j]=='_'):
                 j += 1
             kw = txt[i:j]
             if kw == 'null':
@@ -1398,7 +1566,7 @@ class JSON(object):
         """Decodes a JSON-endoded string into a Python object."""
         if self._allow_unicode_format_control_chars:
             txt = self.strip_format_control_chars(txt)
-        r = self.decodeobj(txt, 0)
+        r = self.decodeobj(txt, 0, only_object_or_array=not self._allow_any_type_at_start)
         if not r:
             raise JSONDecodeError('can not decode value',txt)
         else:
@@ -1427,86 +1595,125 @@ class JSON(object):
         can be encoded.
 
         """
-        json = self.encode_equivalent( obj, nest_level=nest_level )
-        if json is not None:
-            return json
-
         chunks = []
+        self.encode_helper(chunks, obj, nest_level)
+        return ''.join( chunks )
+
+    def encode_helper(self, chunklist, obj, nest_level):
+        #print 'encode_helper(chunklist=%r, obj=%r, nest_level=%r)'%(chunklist,obj,nest_level)
+        if hasattr(obj, 'json_equivalent'):
+            json = self.encode_equivalent( obj, nest_level=nest_level )
+            if json is not None:
+                chunklist.append( json )
+                return
         if obj is None:
-            chunks.append(self.encode_null())
+            chunklist.append( self.encode_null() )
         elif obj is undefined:
             if self._allow_undefined_values:
-                chunks.append(self.encode_undefined())
+                chunklist.append( self.encode_undefined() )
             else:
                 raise JSONEncodeError('strict JSON does not permit "undefined" values')
-        elif isinstance(obj,bool):
-            chunks.append(self.encode_boolean(obj))
-        elif isstringtype(obj):
-            chunks.append(self.encode_string(obj))
-        elif isinstance(obj,(int,long,float)):
-            chunks.append(self.encode_number(obj))
+        elif isinstance(obj, bool):
+            chunklist.append( self.encode_boolean(obj) )
+        elif isinstance(obj, (int,long,float)):
+            chunklist.append( self.encode_number(obj) )
+        elif isinstance(obj, basestring) or isstringtype(obj):
+            chunklist.append( self.encode_string(obj) )
         else:
-            try:
-                # a sequence?
-                it = iter(obj)
-            except TypeError:
-                it = None
-            if it is not None:
-                isdict = hasattr(obj,'__getitem__') and hasattr(obj,'keys') # minimal dict/UserDict interface
-                if isdict:
-                    chunks.append('{')
-                else:
-                    chunks.append('[')
-                if not self._encode_compactly:
-                    indent0 = '  ' * nest_level
-                    indent = '  ' * (nest_level+1)
-                    chunks.append(' ')
-                sequence_chunks = []  # use this to allow sorting afterwards if dict
-                try:
-                    n = 0
-                    while True:
-                        obj2 = it.next()
-                        item_chunks = []
-                        if isdict and not isstringtype(obj2):
-                            # Check JSON restrictions on key types
-                            if isnumbertype(obj2):
-                                if not self._allow_nonstring_keys:
-                                    raise JSONEncodeError('object properties (dictionary keys) must be strings in strict JSON',obj2)
-                            else:
-                                raise JSONEncodeError('object properties (dictionary keys) can only be strings or numbers in ECMAScript',obj2)
-                        item_chunks.append( self.encode( obj2, nest_level=nest_level+1 ) )
-                        if isdict:
-                            if self._encode_compactly:
-                                item_chunks.append(':')
-                            else:
-                                item_chunks.append(' : ')
-                            obj3 = obj[obj2]
-                            item_chunks.append( self.encode( obj3, nest_level=nest_level+2 ) )
-                        sequence_chunks.append( ''.join(item_chunks) )
-                        n += 1
-                except StopIteration:
-                    pass
+            self.encode_composite(chunklist, obj, nest_level)
 
-                if isdict and self._sort_dictionary_keys:
-                    sequence_chunks.sort()  # Note sorts by JSON repr, not original Python object
-                if self._encode_compactly:
-                    chunks.append( ','.join( sequence_chunks ) )
-                else:
-                    chunks.append( (',\n'+indent).join( sequence_chunks ) )
+    def encode_composite(self, chunklist, obj, nest_level):
+        """Encodes just dictionaries, lists, or sequences.
 
-                if not self._encode_compactly:
-                    if n > 1:
-                        chunks.append('\n' + indent0)
-                    else:
-                        chunks.append(' ')
-                if isdict:
-                    chunks.append('}')
+        Basically handles any python type for which iter() can create
+        an iterator object.
+
+        This method is not intended to be called directly.  Use the
+        encode() method instead.
+
+        """
+        #print 'encode_complex_helper(chunklist=%r, obj=%r, nest_level=%r)'%(chunklist,obj,nest_level)
+        try:
+            # Is it a sequence?  Try to make an iterator for it.
+            it = iter(obj)
+        except TypeError:
+            it = None
+        if it is not None:
+            # Does it look like a dictionary?  Check for a minimal dict or
+            # UserDict interface.
+            isdict = hasattr(obj, '__getitem__') and hasattr(obj, 'keys')
+            compactly = self._encode_compactly
+            if isdict:
+                chunklist.append('{')
+                if compactly:
+                    dictcolon = ':'
                 else:
-                    chunks.append(']')
+                    dictcolon = ' : '
             else:
-                json2 = self.encode_default( obj, nest_level=nest_level )
-                chunks.append( json2 )
-        return ''.join(chunks)
+                chunklist.append('[')
+            #print nest_level, 'opening sequence:', repr(chunklist)
+            if not compactly:
+                indent0 = '  ' * nest_level
+                indent = '  ' * (nest_level+1)
+                chunklist.append(' ')
+            sequence_chunks = []  # use this to allow sorting afterwards if dict
+            try: # while not StopIteration
+                numitems = 0
+                while True:
+                    obj2 = it.next()
+                    if obj2 is obj:
+                        raise JSONEncodeError('trying to encode an infinite sequence',obj)
+                    if isdict and not isstringtype(obj2):
+                        # Check JSON restrictions on key types
+                        if isnumbertype(obj2):
+                            if not self._allow_nonstring_keys:
+                                raise JSONEncodeError('object properties (dictionary keys) must be strings in strict JSON',obj2)
+                        else:
+                            raise JSONEncodeError('object properties (dictionary keys) can only be strings or numbers in ECMAScript',obj2)
+
+                    # Encode this item in the sequence and put into item_chunks
+                    item_chunks = []
+                    self.encode_helper( item_chunks, obj2, nest_level=nest_level+1 )
+                    if isdict:
+                        item_chunks.append(dictcolon)
+                        obj3 = obj[obj2]
+                        self.encode_helper(item_chunks, obj3, nest_level=nest_level+2)
+
+                    #print nest_level, numitems, 'item:', repr(obj2)
+                    #print nest_level, numitems, 'sequence_chunks:', repr(sequence_chunks)
+                    #print nest_level, numitems, 'item_chunks:', repr(item_chunks)
+                    #extend_list_with_sep(sequence_chunks, item_chunks)
+                    sequence_chunks.append(item_chunks)
+                    #print nest_level, numitems, 'new sequence_chunks:', repr(sequence_chunks)
+                    numitems += 1
+            except StopIteration:
+                pass
+
+            if isdict and self._sort_dictionary_keys:
+                sequence_chunks.sort()  # Note sorts by JSON repr, not original Python object
+            if compactly:
+                sep = ','
+            else:
+                sep = ',\n' + indent
+
+            #print nest_level, 'closing sequence'
+            #print nest_level, 'chunklist:', repr(chunklist)
+            #print nest_level, 'sequence_chunks:', repr(sequence_chunks)
+            extend_and_flatten_list_with_sep( chunklist, sequence_chunks, sep )
+            #print nest_level, 'new chunklist:', repr(chunklist)
+
+            if not compactly:
+                if numitems > 1:
+                    chunklist.append('\n' + indent0)
+                else:
+                    chunklist.append(' ')
+            if isdict:
+                chunklist.append('}')
+            else:
+                chunklist.append(']')
+        else: # Can't create an iterator for the object
+            json2 = self.encode_default( obj, nest_level=nest_level )
+            chunklist.append( json2 )
 
     def encode_equivalent( self, obj, nest_level=0 ):
         """This method is used to encode user-defined class objects.
@@ -1541,7 +1748,7 @@ class JSON(object):
         to extend this encoder to handle additional types.
 
         """
-        raise JSONDecodeError('can not encode object into a JSON representation',obj)
+        raise JSONEncodeError('can not encode object into a JSON representation',obj)
 
 
 # ------------------------------
@@ -1590,7 +1797,7 @@ def encode( obj, strict=False, compactly=True, escape_unicode=True, encoding=Non
             # No built-in codec was found, see if it is something we
             # can do ourself.
             encoding = encoding.lower()
-            if encoding.startswith('utf-32') \
+            if encoding.startswith('utf-32') or encoding.startswith('utf32') \
                    or encoding.startswith('ucs4') \
                    or encoding.startswith('ucs-4'):
                 # Python doesn't natively have a UTF-32 codec, but JSON

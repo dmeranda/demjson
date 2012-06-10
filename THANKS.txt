@@ -5,3 +5,5 @@ developing the JSON data format and pursuing an RFC standard for it.
 Reported bugs:
   * Adam Braun -- reported bug in 1.0 release regarding newlines being
         rejected during decoding if at the beginning of the input.
+  * Nicolas Bonardelle -- reported bug in 1.1 release where the wrong
+        kind of exception could be raised by encode_default().

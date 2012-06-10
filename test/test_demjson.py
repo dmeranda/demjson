@@ -4,7 +4,16 @@
 
 """
 
+import sys, os, time
 import unittest
+
+# Force PYTHONPATH to head of sys.path, as the easy_install (egg files) will
+# have rudely forced itself ahead of PYTHONPATH.
+
+for pos, name in enumerate(os.environ.get('PYTHONPATH','').split(os.pathsep)):
+    if os.path.isdir(name):
+        sys.path.insert(pos, name)
+
 import demjson
 
 class DemjsonTest(unittest.TestCase):
@@ -37,25 +46,46 @@ class DemjsonTest(unittest.TestCase):
         self.assertEqual(demjson.decode('1.5'), 1.5)
         self.assertEqual(demjson.decode('-1.5'), -1.5)
         self.assertEqual(demjson.decode('3e10'), 30000000000)
+        self.assertEqual(demjson.decode('3E10'), 30000000000)
+        self.assertEqual(demjson.decode('3e+10'), 30000000000)
+        self.assertEqual(demjson.decode('3E+10'), 30000000000)
+        self.assertEqual(demjson.decode('3E+00010'), 30000000000)
         self.assertEqual(demjson.decode('1000e-2'), 10)
         self.assertEqual(demjson.decode('1.2E+3'), 1200)
         self.assertEqual(demjson.decode('3.5e+8'), 350000000)
         self.assertEqual(demjson.decode('-3.5e+8'), -350000000)
-        self.assertEqual(demjson.decode('1.23456e+078'), 1.23456e78)
-        self.assertEqual(demjson.decode('1.23456e-078'), 1.23456e-78)
-        self.assertEqual(demjson.decode('-1.23456e+078'), -1.23456e78)
-        self.assertEqual(demjson.decode('-1.23456e-078'), -1.23456e-78)
-        self.assertEqual(demjson.decode('0x1f', allow_hex_numbers=True), 31)
-        self.assertEqual(demjson.decode('0x1F', allow_hex_numbers=True), 31)
-        self.assertEqual(demjson.decode('017', allow_octal_numbers=True), 15)
+        self.assertAlmostEqual(demjson.decode('1.23456e+078'), 1.23456e78)
+        self.assertAlmostEqual(demjson.decode('1.23456e-078'), 1.23456e-78)
+        self.assertAlmostEqual(demjson.decode('-1.23456e+078'), -1.23456e78)
+        self.assertAlmostEqual(demjson.decode('-1.23456e-078'), -1.23456e-78)
 
     def testDecodeStrictNumber(self):
         """Make sure that strict mode is picky about numbers."""
-        for badnum in ['+1', '.5', '1.', '01', '0x1']:
+        for badnum in ['+1', '.5', '1.', '01', '0x1', '1e']:
             try:
-                self.assertRaises(demjson.JSONDecodeError, demjson.decode, badnum, strict=True)
+                self.assertRaises(demjson.JSONDecodeError, demjson.decode, badnum, strict=True, allow_any_type_at_start=True)
             except demjson.JSONDecodeError:
                 pass
+
+    def testDecodeHexNumbers(self):
+        self.assertEqual(demjson.decode('0x8', allow_hex_numbers=True), 8)
+        self.assertEqual(demjson.decode('0x1f', allow_hex_numbers=True), 31)
+        self.assertEqual(demjson.decode('0x1F', allow_hex_numbers=True), 31)
+        self.assertEqual(demjson.decode('0xff', allow_hex_numbers=True), 255)
+        self.assertEqual(demjson.decode('0xffff', allow_hex_numbers=True), 65535)
+        self.assertEqual(demjson.decode('0xffffffff', allow_hex_numbers=True), 4294967295)
+
+    def testDecodeLargeIntegers(self):
+        self.assertEqual(demjson.decode('9876543210123456789'), 9876543210123456789)
+        self.assertEqual(demjson.decode('-9876543210123456789'), -9876543210123456789)
+        self.assertEqual(demjson.decode('0xfedcba9876543210ABCDEF', allow_hex_numbers=True), 308109520888805757320678895)
+        self.assertEqual(demjson.decode('-0xfedcba9876543210ABCDEF', allow_hex_numbers=True), -308109520888805757320678895)
+        self.assertEqual(demjson.decode('0177334565141662503102052746757', allow_octal_numbers=True),  308109520888805757320678895)
+        self.assertEqual(demjson.decode('-0177334565141662503102052746757', allow_octal_numbers=True),  -308109520888805757320678895)
+
+    def testDecodeOctalNumbers(self):
+        self.assertEqual(demjson.decode('017', allow_octal_numbers=True), 15)
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '018', allow_octal_numbers=True)
 
     def testDecodeNegativeZero(self):
         """Makes sure 0 and -0 are distinct.
@@ -70,18 +100,59 @@ class DemjsonTest(unittest.TestCase):
         self.assert_(demjson.decode('0') is not demjson.decode('-0'),
                      'Numbers 0 and -0 are not distinct')
 
+    def assertMatchesRegex(self, value, pattern, msg=None):
+        import re
+        r = re.compile( '^' + pattern + '$' )
+        try:
+            m = r.match( value )
+        except TypeError:
+            raise self.failureException, \
+                  "can't compare non-string to regex: %r" % value
+        if m is None:
+            raise self.failureException, \
+                  (msg or '%r !~ /%s/' %(value,pattern))
+
     def testEncodeNumber(self):
         self.assertEqual(demjson.encode(0), '0')
         self.assertEqual(demjson.encode(12345), '12345')
         self.assertEqual(demjson.encode(-12345), '-12345')
-        self.assertEqual(demjson.encode(1.5), '1.5')
-        self.assertEqual(demjson.encode(-1.5), '-1.5')
-        self.assertEqual(demjson.encode(1.23456e78), '1.23456e+78')
-        self.assertEqual(demjson.encode(1.23456e-78), '1.23456e-78')
-        self.assertEqual(demjson.encode(-1.23456e78), '-1.23456e+78')
-        self.assertEqual(demjson.encode(-1.23456e-78), '-1.23456e-78')
-        self.assert_(demjson.encode(0.0000043) in ['4.3e-06', '4.3e-6'])
-        self.assert_(demjson.encode(40000000000) in ['4e+10','40000000000'],
+        # Floating point numbers must be "approximately" compared to
+        # allow for slight changes due to rounding errors in the
+        # least significant digits.
+        self.assertMatchesRegex(demjson.encode(1.5),
+                                r'1.(' \
+                                r'(5(000+[0-9])?)' \
+                                r'|' \
+                                r'(4999(9+[0-9])?)' \
+                                r')' )
+        self.assertMatchesRegex(demjson.encode(-1.5),
+                                r'-1.(' \
+                                r'(5(000+[0-9])?)' \
+                                r'|' \
+                                r'(4999(9+[0-9])?)' \
+                                r')' )
+        self.assertMatchesRegex(demjson.encode(1.2300456e78),
+                                r'1.230045(' \
+                                r'(6(0+[0-9])?)' r'|' \
+                                r'(59(9+[0-9])?)' \
+                                r')[eE][+]0*78')
+        self.assertMatchesRegex(demjson.encode(1.2300456e-78),
+                                r'1.230045(' \
+                                r'(6(0+[0-9])?)' r'|' \
+                                r'(59(9+[0-9])?)' \
+                                r')[eE][-]0*78')
+        self.assertMatchesRegex(demjson.encode(-1.2300456e78),
+                                r'-1.230045(' \
+                                r'(6(0+[0-9])?)' r'|' \
+                                r'(59(9+[0-9])?)' \
+                                r')[eE][+]0*78')
+        self.assertMatchesRegex(demjson.encode(-1.2300456e-78),
+                                r'-1.230045(' \
+                                r'(6(0+[0-9])?)' r'|' \
+                                r'(59(9+[0-9])?)' \
+                                r')[eE][-]0*78')
+        self.assertMatchesRegex(demjson.encode(0.0000043), r'4.3[0[0-9]*]?[eE]-0*6$')
+        self.assertMatchesRegex(demjson.encode(40000000000), r'(4[eE]+0*10)|(40000000000)$',
                      'Large integer not encoded properly')
 
     def testEncodeNegativeZero(self):
@@ -104,6 +175,10 @@ class DemjsonTest(unittest.TestCase):
         self.assertEqual(demjson.encode('\n'), r'"\n"')
         self.assertEqual(demjson.encode('"'), r'"\""')
         self.assertEqual(demjson.encode('\\'), '"\\\\"')
+
+    def testDecodeStringWithNull(self):
+        self.assertEqual(demjson.decode('"\x00"'), '\0')
+        self.assertEqual(demjson.decode('"a\x00b"'), 'a\x00b')
 
     def testDecodeStringUnicodeEscape(self):
         self.assertEqual(demjson.decode(r'"\u0000"'), '\0')
@@ -171,9 +246,18 @@ class DemjsonTest(unittest.TestCase):
         self.assertEqual(demjson.decode('[ "z" ]'), ['z'])
         self.assertEqual(demjson.decode('[ "z[a]" ]'), ['z[a]'])
 
+    def testDecodeArrayBad(self):
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '[,]', strict=True)
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '[1,]', strict=True)
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '[,1]', strict=True)
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '[1,,2]', strict=True)
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '[1 2]', strict=True)
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '[[][]]', strict=True)
+
     def testDecodeArrayNested(self):
         self.assertEqual(demjson.decode('[[]]'), [[]])
         self.assertEqual(demjson.decode('[ [ ] ]'), [[]])
+        self.assertEqual(demjson.decode('[[],[]]'), [[],[]])
         self.assertEqual(demjson.decode('[[42]]'), [[42]])
         self.assertEqual(demjson.decode('[[42,99]]'), [[42,99]])
         self.assertEqual(demjson.decode('[[42],33]'), [[42],33])
@@ -199,6 +283,13 @@ class DemjsonTest(unittest.TestCase):
         self.assertEqual(demjson.decode('{"a":1,"b":2}'), {'a':1,'b':2})
         self.assertEqual(demjson.decode('{"a":1,"b":2,"c{":3}'), {'a':1,'b':2,'c{':3})
         self.assertEqual(demjson.decode('{"a":1,"b":2,"d}":3}'), {'a':1,'b':2,'d}':3})
+
+    def testDecodeObjectBad(self):
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '{"a"}', strict=True)
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '{"a":}', strict=True)
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '{,"a":1}', strict=True)
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '{"a":1,}', strict=True)
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '{["a","b"]:1}', strict=True)
 
     def testDecodeObjectNested(self):
         self.assertEqual(demjson.decode('{"a":{"b":2}}'), {'a':{'b':2}})
@@ -271,6 +362,25 @@ class DemjsonTest(unittest.TestCase):
                           {55:'fiftyfive'}, strict=True)
         self.assertEqual(demjson.encode({55:55}, strict=False), '{55:55}')
 
+    def testDecodeWhitespace(self):
+        self.assertEqual(demjson.decode(' []'), [])
+        self.assertEqual(demjson.decode('[] '), [])
+        self.assertEqual(demjson.decode(' [ ] '), [])
+        self.assertEqual(demjson.decode('\n[]\n'), [])
+        self.assertEqual(demjson.decode('\t\r \n[\n\t]\n'), [])
+        # Form-feed is not a valid JSON whitespace char
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '\x0c[]', strict=True)
+        # No-break-space is not a valid JSON whitespace char
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, u'\u00a0[]', strict=True)
+
+    def testDecodeInvalidStartingType(self):
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '', strict=True)
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '1', strict=True)
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '1.5', strict=True)
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '"a"', strict=True)
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, 'true', strict=True)
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, 'null', strict=True)
+
     def testDecodeMixed(self):
         self.assertEqual(demjson.decode('[0.5,{"3e6":[true,"d{["]}]'), \
                          [0.5, {'3e6': [True, 'd{[']}] )
@@ -292,6 +402,7 @@ class DemjsonTest(unittest.TestCase):
                           '/*hi/*x*/42', allow_comments=True)
 
 def run_all_tests():
+    print 'Running with demjson version', demjson.__version__
     unittest.main()
     
 if __name__ == '__main__':
