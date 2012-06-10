@@ -114,9 +114,9 @@ r""" A JSON data encoder and decoder.
 """
 
 __author__ = "Deron Meranda <http://deron.meranda.us/>"
-__date__ = "2008-12-17"
-__version__ = "1.4"
-__credits__ = """Copyright (c) 2006-2008 Deron E. Meranda <http://deron.meranda.us/>
+__date__ = "2010-10-10"
+__version__ = "1.5"
+__credits__ = """Copyright (c) 2006-2010 Deron E. Meranda <http://deron.meranda.us/>
 Licensed under GNU LGPL 3.0 (GNU Lesser General Public License) or
 later.  See LICENSE.txt included with this software.
 
@@ -907,7 +907,7 @@ class JSON(object):
         # need to be escaped.
 
         self._asciiencodable = [32 <= c < 128 and not self._rev_escapes.has_key(chr(c))
-                              for c in range(0,255)]
+                                for c in range(0,256)]
 
     def _set_strictness(self, strict):
         """Changes the strictness behavior.

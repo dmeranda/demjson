@@ -116,12 +116,12 @@ DESCRIPTION
          <http://www.cs.berkeley.edu/~ejr/Projects/ieee754/>
 
 CLASSES
+    __builtin__.object
+        JSON
     exceptions.ValueError(exceptions.StandardError)
         JSONError
             JSONDecodeError
             JSONEncodeError
-    __builtin__.object
-        JSON
     
     class JSON(__builtin__.object)
      |  An encoder/decoder for JSON data streams.
@@ -353,41 +353,25 @@ CLASSES
      |      Ref. ECMAScript section 7.1.
      |  
      |  ----------------------------------------------------------------------
-     |  Properties defined here:
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
      |  
      |  allowed_behaviors
      |      List of known behaviors that are currently allowed
      |  
-     |      <get> = _get_allowed_behaviors(self)
-     |  
      |  behaviors
      |      List of known behaviors that can be passed to allow() or prevent() methods
-     |  
-     |      <get> = _get_behaviors(self)
      |  
      |  prevented_behaviors
      |      List of known behaviors that are currently prevented
      |  
-     |      <get> = _get_prevented_behaviors(self)
-     |  
      |  strict
      |      True if adherence to RFC 4627 syntax is strict, or False is more generous ECMAScript syntax is permitted
-     |  
-     |      <get> = _is_strict(self)
-     |  
-     |      <set> = _set_strictness(self, strict)
-     |          Changes the strictness behavior.
-     |          
-     |          Pass True to be very strict about JSON syntax, or False to be looser.
-     |  
-     |  ----------------------------------------------------------------------
-     |  Data and other attributes defined here:
-     |  
-     |  __dict__ = <dictproxy object>
-     |      dictionary for instance variables (if defined)
-     |  
-     |  __weakref__ = <attribute '__weakref__' of 'JSON' objects>
-     |      list of weak references to the object (if defined)
     
     class JSONDecodeError(JSONError)
      |  An exception class raised when a JSON decoding error (syntax error) occurs.
@@ -398,19 +382,71 @@ CLASSES
      |      exceptions.ValueError
      |      exceptions.StandardError
      |      exceptions.Exception
+     |      exceptions.BaseException
+     |      __builtin__.object
      |  
      |  Methods inherited from JSONError:
      |  
      |  pretty_description(self)
      |  
      |  ----------------------------------------------------------------------
-     |  Methods inherited from exceptions.Exception:
+     |  Data descriptors inherited from JSONError:
      |  
-     |  __getitem__(...)
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from exceptions.ValueError:
      |  
      |  __init__(...)
+     |      x.__init__(...) initializes x; see x.__class__.__doc__ for signature
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes inherited from exceptions.ValueError:
+     |  
+     |  __new__ = <built-in method __new__ of type object at 0x36d5b79f20>
+     |      T.__new__(S, ...) -> a new object with type S, a subtype of T
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from exceptions.BaseException:
+     |  
+     |  __delattr__(...)
+     |      x.__delattr__('name') <==> del x.name
+     |  
+     |  __getattribute__(...)
+     |      x.__getattribute__('name') <==> x.name
+     |  
+     |  __getitem__(...)
+     |      x.__getitem__(y) <==> x[y]
+     |  
+     |  __getslice__(...)
+     |      x.__getslice__(i, j) <==> x[i:j]
+     |      
+     |      Use of negative indices is not supported.
+     |  
+     |  __reduce__(...)
+     |  
+     |  __repr__(...)
+     |      x.__repr__() <==> repr(x)
+     |  
+     |  __setattr__(...)
+     |      x.__setattr__('name', value) <==> x.name = value
+     |  
+     |  __setstate__(...)
      |  
      |  __str__(...)
+     |      x.__str__() <==> str(x)
+     |  
+     |  __unicode__(...)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from exceptions.BaseException:
+     |  
+     |  __dict__
+     |  
+     |  args
+     |  
+     |  message
     
     class JSONEncodeError(JSONError)
      |  An exception class raised when a python object can not be encoded as a JSON string.
@@ -421,19 +457,71 @@ CLASSES
      |      exceptions.ValueError
      |      exceptions.StandardError
      |      exceptions.Exception
+     |      exceptions.BaseException
+     |      __builtin__.object
      |  
      |  Methods inherited from JSONError:
      |  
      |  pretty_description(self)
      |  
      |  ----------------------------------------------------------------------
-     |  Methods inherited from exceptions.Exception:
+     |  Data descriptors inherited from JSONError:
      |  
-     |  __getitem__(...)
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from exceptions.ValueError:
      |  
      |  __init__(...)
+     |      x.__init__(...) initializes x; see x.__class__.__doc__ for signature
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes inherited from exceptions.ValueError:
+     |  
+     |  __new__ = <built-in method __new__ of type object at 0x36d5b79f20>
+     |      T.__new__(S, ...) -> a new object with type S, a subtype of T
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from exceptions.BaseException:
+     |  
+     |  __delattr__(...)
+     |      x.__delattr__('name') <==> del x.name
+     |  
+     |  __getattribute__(...)
+     |      x.__getattribute__('name') <==> x.name
+     |  
+     |  __getitem__(...)
+     |      x.__getitem__(y) <==> x[y]
+     |  
+     |  __getslice__(...)
+     |      x.__getslice__(i, j) <==> x[i:j]
+     |      
+     |      Use of negative indices is not supported.
+     |  
+     |  __reduce__(...)
+     |  
+     |  __repr__(...)
+     |      x.__repr__() <==> repr(x)
+     |  
+     |  __setattr__(...)
+     |      x.__setattr__('name', value) <==> x.name = value
+     |  
+     |  __setstate__(...)
      |  
      |  __str__(...)
+     |      x.__str__() <==> str(x)
+     |  
+     |  __unicode__(...)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from exceptions.BaseException:
+     |  
+     |  __dict__
+     |  
+     |  args
+     |  
+     |  message
     
     class JSONError(exceptions.ValueError)
      |  Our base class for all JSON-related errors.
@@ -443,19 +531,71 @@ CLASSES
      |      exceptions.ValueError
      |      exceptions.StandardError
      |      exceptions.Exception
+     |      exceptions.BaseException
+     |      __builtin__.object
      |  
      |  Methods defined here:
      |  
      |  pretty_description(self)
      |  
      |  ----------------------------------------------------------------------
-     |  Methods inherited from exceptions.Exception:
+     |  Data descriptors defined here:
      |  
-     |  __getitem__(...)
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from exceptions.ValueError:
      |  
      |  __init__(...)
+     |      x.__init__(...) initializes x; see x.__class__.__doc__ for signature
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes inherited from exceptions.ValueError:
+     |  
+     |  __new__ = <built-in method __new__ of type object at 0x36d5b79f20>
+     |      T.__new__(S, ...) -> a new object with type S, a subtype of T
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from exceptions.BaseException:
+     |  
+     |  __delattr__(...)
+     |      x.__delattr__('name') <==> del x.name
+     |  
+     |  __getattribute__(...)
+     |      x.__getattribute__('name') <==> x.name
+     |  
+     |  __getitem__(...)
+     |      x.__getitem__(y) <==> x[y]
+     |  
+     |  __getslice__(...)
+     |      x.__getslice__(i, j) <==> x[i:j]
+     |      
+     |      Use of negative indices is not supported.
+     |  
+     |  __reduce__(...)
+     |  
+     |  __repr__(...)
+     |      x.__repr__() <==> repr(x)
+     |  
+     |  __setattr__(...)
+     |      x.__setattr__('name', value) <==> x.name = value
+     |  
+     |  __setstate__(...)
      |  
      |  __str__(...)
+     |      x.__str__() <==> str(x)
+     |  
+     |  __unicode__(...)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from exceptions.BaseException:
+     |  
+     |  __dict__
+     |  
+     |  args
+     |  
+     |  message
 
 FUNCTIONS
     auto_unicode_decode(s)
@@ -580,11 +720,10 @@ FUNCTIONS
 
 DATA
     __author__ = 'Deron Meranda <http://deron.meranda.us/>'
-    __credits__ = 'Copyright (c) 2006-2008 Deron E. Meranda <http:/.../lic...
-    __date__ = '2008-12-17'
-    __version__ = '1.4'
+    __credits__ = 'Copyright (c) 2006-2010 Deron E. Meranda <http:/.../lic...
+    __date__ = '2010-10-10'
+    __version__ = '1.5'
     content_type = 'application/json'
-    decimal = None
     file_ext = 'json'
     float_maxexp = 307
     float_sigdigits = 15
@@ -598,16 +737,16 @@ DATA
     unsafe_string_chars = '"\\\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b...
 
 VERSION
-    1.4
+    1.5
 
 DATE
-    2008-12-17
+    2010-10-10
 
 AUTHOR
     Deron Meranda <http://deron.meranda.us/>
 
 CREDITS
-    Copyright (c) 2006-2008 Deron E. Meranda <http://deron.meranda.us/>
+    Copyright (c) 2006-2010 Deron E. Meranda <http://deron.meranda.us/>
     Licensed under GNU LGPL 3.0 (GNU Lesser General Public License) or
     later.  See LICENSE.txt included with this software.
     

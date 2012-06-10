@@ -1,5 +1,11 @@
 Change history for demjson python module.
 
+Version 1.5 released 2010-10-10
+
+ * Bug fix. When encoding Python strings to JSON, occurances of
+   character U+00FF (ASCII 255 or 0xFF) may result in an error.
+   Thanks to Tom Kho and Yanxin Shi for reporting this bug.
+
 Version 1.4 released 2008-12-17
 
  * Changed license to LGPL 3 (GNU Lesser General Public License) or

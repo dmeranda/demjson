@@ -1,12 +1,12 @@
 
-<!doctype html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
 <html><head><title>Python: module demjson</title>
 </head><body bgcolor="#f0f0f8">
 
 <table width="100%" cellspacing=0 cellpadding=2 border=0 summary="heading">
 <tr bgcolor="#7799ee">
 <td valign=bottom>&nbsp;<br>
-<font color="#ffffff" face="helvetica, arial">&nbsp;<br><big><big><strong>demjson</strong></big></big> (version 1.4, 2008-12-17)</font></td
+<font color="#ffffff" face="helvetica, arial">&nbsp;<br><big><big><strong>demjson</strong></big></big> (version 1.5, 2010-10-10)</font></td
 ><td align=right valign=bottom
 ><font color="#ffffff" face="helvetica, arial"><a href=".">index</a><br><a href="demjson.py">demjson.py</a></font></td></tr></table>
     <p><tt>A&nbsp;<a href="#JSON">JSON</a>&nbsp;data&nbsp;encoder&nbsp;and&nbsp;decoder.<br>
@@ -120,12 +120,26 @@ References:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;<a href="http://www.cs.berkeley.edu/~ejr/Projects/ieee754/">http://www.cs.berkeley.edu/~ejr/Projects/ieee754/</a>&gt;</tt></p>
 <p>
 <table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#aa55cc">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Modules</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#aa55cc"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><table width="100%" summary="list"><tr><td width="25%" valign=top><a href="decimal.html">decimal</a><br>
+</td><td width="25%" valign=top></td><td width="25%" valign=top></td><td width="25%" valign=top></td></tr></table></td></tr></table><p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
 <tr bgcolor="#ee77aa">
 <td colspan=3 valign=bottom>&nbsp;<br>
 <font color="#ffffff" face="helvetica, arial"><big><strong>Classes</strong></big></font></td></tr>
     
 <tr><td bgcolor="#ee77aa"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
 <td width="100%"><dl>
+<dt><font face="helvetica, arial"><a href="__builtin__.html#object">__builtin__.object</a>
+</font></dt><dd>
+<dl>
+<dt><font face="helvetica, arial"><a href="demjson.html#JSON">JSON</a>
+</font></dt></dl>
+</dd>
 <dt><font face="helvetica, arial"><a href="exceptions.html#ValueError">exceptions.ValueError</a>(<a href="exceptions.html#StandardError">exceptions.StandardError</a>)
 </font></dt><dd>
 <dl>
@@ -137,12 +151,6 @@ References:<br>
 </font></dt></dl>
 </dd>
 </dl>
-</dd>
-<dt><font face="helvetica, arial"><a href="__builtin__.html#object">__builtin__.object</a>
-</font></dt><dd>
-<dl>
-<dt><font face="helvetica, arial"><a href="demjson.html#JSON">JSON</a>
-</font></dt></dl>
 </dd>
 </dl>
  <p>
@@ -354,35 +362,25 @@ tokenization&nbsp;occurs.&nbsp;&nbsp;Note&nbsp;that&nbsp;<a href="#JSON">JSON</a
 Ref.&nbsp;ECMAScript&nbsp;section&nbsp;7.1.</tt></dd></dl>
 
 <hr>
-Properties defined here:<br>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
 <dl><dt><strong>allowed_behaviors</strong></dt>
 <dd><tt>List&nbsp;of&nbsp;known&nbsp;behaviors&nbsp;that&nbsp;are&nbsp;currently&nbsp;allowed</tt></dd>
-<dd><dl><dt><a name="JSON-<em>get</em>"><strong><em>get</em></strong></a> = <a href="#JSON-_get_allowed_behaviors">_get_allowed_behaviors</a>(self)</dt></dl>
-</dd>
 </dl>
 <dl><dt><strong>behaviors</strong></dt>
-<dd><tt>List&nbsp;of&nbsp;known&nbsp;behaviors&nbsp;that&nbsp;can&nbsp;be&nbsp;passed&nbsp;to&nbsp;<a href="#JSON-allow">allow</a>()&nbsp;or&nbsp;<a href="#JSON-prevent">prevent</a>()&nbsp;methods</tt></dd>
-<dd><dl><dt><a name="JSON-<em>get</em>"><strong><em>get</em></strong></a> = <a href="#JSON-_get_behaviors">_get_behaviors</a>(self)</dt></dl>
-</dd>
+<dd><tt>List&nbsp;of&nbsp;known&nbsp;behaviors&nbsp;that&nbsp;can&nbsp;be&nbsp;passed&nbsp;to&nbsp;allow()&nbsp;or&nbsp;prevent()&nbsp;methods</tt></dd>
 </dl>
 <dl><dt><strong>prevented_behaviors</strong></dt>
 <dd><tt>List&nbsp;of&nbsp;known&nbsp;behaviors&nbsp;that&nbsp;are&nbsp;currently&nbsp;prevented</tt></dd>
-<dd><dl><dt><a name="JSON-<em>get</em>"><strong><em>get</em></strong></a> = <a href="#JSON-_get_prevented_behaviors">_get_prevented_behaviors</a>(self)</dt></dl>
-</dd>
 </dl>
 <dl><dt><strong>strict</strong></dt>
 <dd><tt>True&nbsp;if&nbsp;adherence&nbsp;to&nbsp;<a href="http://www.rfc-editor.org/rfc/rfc4627.txt">RFC&nbsp;4627</a>&nbsp;syntax&nbsp;is&nbsp;strict,&nbsp;or&nbsp;False&nbsp;is&nbsp;more&nbsp;generous&nbsp;ECMAScript&nbsp;syntax&nbsp;is&nbsp;permitted</tt></dd>
-<dd><dl><dt><a name="JSON-<em>get</em>"><strong><em>get</em></strong></a> = <a href="#JSON-_is_strict">_is_strict</a>(self)</dt></dl>
-</dd>
-<dd><dl><dt><a name="JSON-<em>set</em>"><strong><em>set</em></strong></a> = <a href="#JSON-_set_strictness">_set_strictness</a>(self, strict)</dt></dl>
-</dd>
 </dl>
-<hr>
-Data and other attributes defined here:<br>
-<dl><dt><strong>__dict__</strong> = &lt;dictproxy object&gt;<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dl>
-
-<dl><dt><strong>__weakref__</strong> = &lt;attribute '__weakref__' of 'JSON' objects&gt;<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;<a href="__builtin__.html#object">object</a>&nbsp;(if&nbsp;defined)</tt></dl>
-
 </td></tr></table> <p>
 <table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
 <tr bgcolor="#ffc8d8">
@@ -398,19 +396,58 @@ Data and other attributes defined here:<br>
 <dd><a href="exceptions.html#ValueError">exceptions.ValueError</a></dd>
 <dd><a href="exceptions.html#StandardError">exceptions.StandardError</a></dd>
 <dd><a href="exceptions.html#Exception">exceptions.Exception</a></dd>
+<dd><a href="exceptions.html#BaseException">exceptions.BaseException</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
 </dl>
 <hr>
 Methods inherited from <a href="demjson.html#JSONError">JSONError</a>:<br>
 <dl><dt><a name="JSONDecodeError-pretty_description"><strong>pretty_description</strong></a>(self)</dt></dl>
 
 <hr>
-Methods inherited from <a href="exceptions.html#Exception">exceptions.Exception</a>:<br>
-<dl><dt><a name="JSONDecodeError-__getitem__"><strong>__getitem__</strong></a>(...)</dt></dl>
+Data descriptors inherited from <a href="demjson.html#JSONError">JSONError</a>:<br>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<hr>
+Methods inherited from <a href="exceptions.html#ValueError">exceptions.ValueError</a>:<br>
+<dl><dt><a name="JSONDecodeError-__init__"><strong>__init__</strong></a>(...)</dt><dd><tt>x.<a href="#JSONDecodeError-__init__">__init__</a>(...)&nbsp;initializes&nbsp;x;&nbsp;see&nbsp;x.__class__.__doc__&nbsp;for&nbsp;signature</tt></dd></dl>
 
-<dl><dt><a name="JSONDecodeError-__init__"><strong>__init__</strong></a>(...)</dt></dl>
+<hr>
+Data and other attributes inherited from <a href="exceptions.html#ValueError">exceptions.ValueError</a>:<br>
+<dl><dt><strong>__new__</strong> = &lt;built-in method __new__ of type object at 0x36d5b79f20&gt;<dd><tt>T.<a href="#JSONDecodeError-__new__">__new__</a>(S,&nbsp;...)&nbsp;-&gt;&nbsp;a&nbsp;new&nbsp;<a href="__builtin__.html#object">object</a>&nbsp;with&nbsp;type&nbsp;S,&nbsp;a&nbsp;subtype&nbsp;of&nbsp;T</tt></dl>
 
-<dl><dt><a name="JSONDecodeError-__str__"><strong>__str__</strong></a>(...)</dt></dl>
+<hr>
+Methods inherited from <a href="exceptions.html#BaseException">exceptions.BaseException</a>:<br>
+<dl><dt><a name="JSONDecodeError-__delattr__"><strong>__delattr__</strong></a>(...)</dt><dd><tt>x.<a href="#JSONDecodeError-__delattr__">__delattr__</a>('name')&nbsp;&lt;==&gt;&nbsp;del&nbsp;x.name</tt></dd></dl>
 
+<dl><dt><a name="JSONDecodeError-__getattribute__"><strong>__getattribute__</strong></a>(...)</dt><dd><tt>x.<a href="#JSONDecodeError-__getattribute__">__getattribute__</a>('name')&nbsp;&lt;==&gt;&nbsp;x.name</tt></dd></dl>
+
+<dl><dt><a name="JSONDecodeError-__getitem__"><strong>__getitem__</strong></a>(...)</dt><dd><tt>x.<a href="#JSONDecodeError-__getitem__">__getitem__</a>(y)&nbsp;&lt;==&gt;&nbsp;x[y]</tt></dd></dl>
+
+<dl><dt><a name="JSONDecodeError-__getslice__"><strong>__getslice__</strong></a>(...)</dt><dd><tt>x.<a href="#JSONDecodeError-__getslice__">__getslice__</a>(i,&nbsp;j)&nbsp;&lt;==&gt;&nbsp;x[i:j]<br>
+&nbsp;<br>
+Use&nbsp;of&nbsp;negative&nbsp;indices&nbsp;is&nbsp;not&nbsp;supported.</tt></dd></dl>
+
+<dl><dt><a name="JSONDecodeError-__reduce__"><strong>__reduce__</strong></a>(...)</dt></dl>
+
+<dl><dt><a name="JSONDecodeError-__repr__"><strong>__repr__</strong></a>(...)</dt><dd><tt>x.<a href="#JSONDecodeError-__repr__">__repr__</a>()&nbsp;&lt;==&gt;&nbsp;repr(x)</tt></dd></dl>
+
+<dl><dt><a name="JSONDecodeError-__setattr__"><strong>__setattr__</strong></a>(...)</dt><dd><tt>x.<a href="#JSONDecodeError-__setattr__">__setattr__</a>('name',&nbsp;value)&nbsp;&lt;==&gt;&nbsp;x.name&nbsp;=&nbsp;value</tt></dd></dl>
+
+<dl><dt><a name="JSONDecodeError-__setstate__"><strong>__setstate__</strong></a>(...)</dt></dl>
+
+<dl><dt><a name="JSONDecodeError-__str__"><strong>__str__</strong></a>(...)</dt><dd><tt>x.<a href="#JSONDecodeError-__str__">__str__</a>()&nbsp;&lt;==&gt;&nbsp;str(x)</tt></dd></dl>
+
+<dl><dt><a name="JSONDecodeError-__unicode__"><strong>__unicode__</strong></a>(...)</dt></dl>
+
+<hr>
+Data descriptors inherited from <a href="exceptions.html#BaseException">exceptions.BaseException</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+</dl>
+<dl><dt><strong>args</strong></dt>
+</dl>
+<dl><dt><strong>message</strong></dt>
+</dl>
 </td></tr></table> <p>
 <table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
 <tr bgcolor="#ffc8d8">
@@ -426,19 +463,58 @@ Methods inherited from <a href="exceptions.html#Exception">exceptions.Exception<
 <dd><a href="exceptions.html#ValueError">exceptions.ValueError</a></dd>
 <dd><a href="exceptions.html#StandardError">exceptions.StandardError</a></dd>
 <dd><a href="exceptions.html#Exception">exceptions.Exception</a></dd>
+<dd><a href="exceptions.html#BaseException">exceptions.BaseException</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
 </dl>
 <hr>
 Methods inherited from <a href="demjson.html#JSONError">JSONError</a>:<br>
 <dl><dt><a name="JSONEncodeError-pretty_description"><strong>pretty_description</strong></a>(self)</dt></dl>
 
 <hr>
-Methods inherited from <a href="exceptions.html#Exception">exceptions.Exception</a>:<br>
-<dl><dt><a name="JSONEncodeError-__getitem__"><strong>__getitem__</strong></a>(...)</dt></dl>
+Data descriptors inherited from <a href="demjson.html#JSONError">JSONError</a>:<br>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<hr>
+Methods inherited from <a href="exceptions.html#ValueError">exceptions.ValueError</a>:<br>
+<dl><dt><a name="JSONEncodeError-__init__"><strong>__init__</strong></a>(...)</dt><dd><tt>x.<a href="#JSONEncodeError-__init__">__init__</a>(...)&nbsp;initializes&nbsp;x;&nbsp;see&nbsp;x.__class__.__doc__&nbsp;for&nbsp;signature</tt></dd></dl>
 
-<dl><dt><a name="JSONEncodeError-__init__"><strong>__init__</strong></a>(...)</dt></dl>
+<hr>
+Data and other attributes inherited from <a href="exceptions.html#ValueError">exceptions.ValueError</a>:<br>
+<dl><dt><strong>__new__</strong> = &lt;built-in method __new__ of type object at 0x36d5b79f20&gt;<dd><tt>T.<a href="#JSONEncodeError-__new__">__new__</a>(S,&nbsp;...)&nbsp;-&gt;&nbsp;a&nbsp;new&nbsp;<a href="__builtin__.html#object">object</a>&nbsp;with&nbsp;type&nbsp;S,&nbsp;a&nbsp;subtype&nbsp;of&nbsp;T</tt></dl>
 
-<dl><dt><a name="JSONEncodeError-__str__"><strong>__str__</strong></a>(...)</dt></dl>
+<hr>
+Methods inherited from <a href="exceptions.html#BaseException">exceptions.BaseException</a>:<br>
+<dl><dt><a name="JSONEncodeError-__delattr__"><strong>__delattr__</strong></a>(...)</dt><dd><tt>x.<a href="#JSONEncodeError-__delattr__">__delattr__</a>('name')&nbsp;&lt;==&gt;&nbsp;del&nbsp;x.name</tt></dd></dl>
 
+<dl><dt><a name="JSONEncodeError-__getattribute__"><strong>__getattribute__</strong></a>(...)</dt><dd><tt>x.<a href="#JSONEncodeError-__getattribute__">__getattribute__</a>('name')&nbsp;&lt;==&gt;&nbsp;x.name</tt></dd></dl>
+
+<dl><dt><a name="JSONEncodeError-__getitem__"><strong>__getitem__</strong></a>(...)</dt><dd><tt>x.<a href="#JSONEncodeError-__getitem__">__getitem__</a>(y)&nbsp;&lt;==&gt;&nbsp;x[y]</tt></dd></dl>
+
+<dl><dt><a name="JSONEncodeError-__getslice__"><strong>__getslice__</strong></a>(...)</dt><dd><tt>x.<a href="#JSONEncodeError-__getslice__">__getslice__</a>(i,&nbsp;j)&nbsp;&lt;==&gt;&nbsp;x[i:j]<br>
+&nbsp;<br>
+Use&nbsp;of&nbsp;negative&nbsp;indices&nbsp;is&nbsp;not&nbsp;supported.</tt></dd></dl>
+
+<dl><dt><a name="JSONEncodeError-__reduce__"><strong>__reduce__</strong></a>(...)</dt></dl>
+
+<dl><dt><a name="JSONEncodeError-__repr__"><strong>__repr__</strong></a>(...)</dt><dd><tt>x.<a href="#JSONEncodeError-__repr__">__repr__</a>()&nbsp;&lt;==&gt;&nbsp;repr(x)</tt></dd></dl>
+
+<dl><dt><a name="JSONEncodeError-__setattr__"><strong>__setattr__</strong></a>(...)</dt><dd><tt>x.<a href="#JSONEncodeError-__setattr__">__setattr__</a>('name',&nbsp;value)&nbsp;&lt;==&gt;&nbsp;x.name&nbsp;=&nbsp;value</tt></dd></dl>
+
+<dl><dt><a name="JSONEncodeError-__setstate__"><strong>__setstate__</strong></a>(...)</dt></dl>
+
+<dl><dt><a name="JSONEncodeError-__str__"><strong>__str__</strong></a>(...)</dt><dd><tt>x.<a href="#JSONEncodeError-__str__">__str__</a>()&nbsp;&lt;==&gt;&nbsp;str(x)</tt></dd></dl>
+
+<dl><dt><a name="JSONEncodeError-__unicode__"><strong>__unicode__</strong></a>(...)</dt></dl>
+
+<hr>
+Data descriptors inherited from <a href="exceptions.html#BaseException">exceptions.BaseException</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+</dl>
+<dl><dt><strong>args</strong></dt>
+</dl>
+<dl><dt><strong>message</strong></dt>
+</dl>
 </td></tr></table> <p>
 <table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
 <tr bgcolor="#ffc8d8">
@@ -453,19 +529,58 @@ Methods inherited from <a href="exceptions.html#Exception">exceptions.Exception<
 <dd><a href="exceptions.html#ValueError">exceptions.ValueError</a></dd>
 <dd><a href="exceptions.html#StandardError">exceptions.StandardError</a></dd>
 <dd><a href="exceptions.html#Exception">exceptions.Exception</a></dd>
+<dd><a href="exceptions.html#BaseException">exceptions.BaseException</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
 </dl>
 <hr>
 Methods defined here:<br>
 <dl><dt><a name="JSONError-pretty_description"><strong>pretty_description</strong></a>(self)</dt></dl>
 
 <hr>
-Methods inherited from <a href="exceptions.html#Exception">exceptions.Exception</a>:<br>
-<dl><dt><a name="JSONError-__getitem__"><strong>__getitem__</strong></a>(...)</dt></dl>
+Data descriptors defined here:<br>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<hr>
+Methods inherited from <a href="exceptions.html#ValueError">exceptions.ValueError</a>:<br>
+<dl><dt><a name="JSONError-__init__"><strong>__init__</strong></a>(...)</dt><dd><tt>x.<a href="#JSONError-__init__">__init__</a>(...)&nbsp;initializes&nbsp;x;&nbsp;see&nbsp;x.__class__.__doc__&nbsp;for&nbsp;signature</tt></dd></dl>
 
-<dl><dt><a name="JSONError-__init__"><strong>__init__</strong></a>(...)</dt></dl>
+<hr>
+Data and other attributes inherited from <a href="exceptions.html#ValueError">exceptions.ValueError</a>:<br>
+<dl><dt><strong>__new__</strong> = &lt;built-in method __new__ of type object at 0x36d5b79f20&gt;<dd><tt>T.<a href="#JSONError-__new__">__new__</a>(S,&nbsp;...)&nbsp;-&gt;&nbsp;a&nbsp;new&nbsp;<a href="__builtin__.html#object">object</a>&nbsp;with&nbsp;type&nbsp;S,&nbsp;a&nbsp;subtype&nbsp;of&nbsp;T</tt></dl>
 
-<dl><dt><a name="JSONError-__str__"><strong>__str__</strong></a>(...)</dt></dl>
+<hr>
+Methods inherited from <a href="exceptions.html#BaseException">exceptions.BaseException</a>:<br>
+<dl><dt><a name="JSONError-__delattr__"><strong>__delattr__</strong></a>(...)</dt><dd><tt>x.<a href="#JSONError-__delattr__">__delattr__</a>('name')&nbsp;&lt;==&gt;&nbsp;del&nbsp;x.name</tt></dd></dl>
 
+<dl><dt><a name="JSONError-__getattribute__"><strong>__getattribute__</strong></a>(...)</dt><dd><tt>x.<a href="#JSONError-__getattribute__">__getattribute__</a>('name')&nbsp;&lt;==&gt;&nbsp;x.name</tt></dd></dl>
+
+<dl><dt><a name="JSONError-__getitem__"><strong>__getitem__</strong></a>(...)</dt><dd><tt>x.<a href="#JSONError-__getitem__">__getitem__</a>(y)&nbsp;&lt;==&gt;&nbsp;x[y]</tt></dd></dl>
+
+<dl><dt><a name="JSONError-__getslice__"><strong>__getslice__</strong></a>(...)</dt><dd><tt>x.<a href="#JSONError-__getslice__">__getslice__</a>(i,&nbsp;j)&nbsp;&lt;==&gt;&nbsp;x[i:j]<br>
+&nbsp;<br>
+Use&nbsp;of&nbsp;negative&nbsp;indices&nbsp;is&nbsp;not&nbsp;supported.</tt></dd></dl>
+
+<dl><dt><a name="JSONError-__reduce__"><strong>__reduce__</strong></a>(...)</dt></dl>
+
+<dl><dt><a name="JSONError-__repr__"><strong>__repr__</strong></a>(...)</dt><dd><tt>x.<a href="#JSONError-__repr__">__repr__</a>()&nbsp;&lt;==&gt;&nbsp;repr(x)</tt></dd></dl>
+
+<dl><dt><a name="JSONError-__setattr__"><strong>__setattr__</strong></a>(...)</dt><dd><tt>x.<a href="#JSONError-__setattr__">__setattr__</a>('name',&nbsp;value)&nbsp;&lt;==&gt;&nbsp;x.name&nbsp;=&nbsp;value</tt></dd></dl>
+
+<dl><dt><a name="JSONError-__setstate__"><strong>__setstate__</strong></a>(...)</dt></dl>
+
+<dl><dt><a name="JSONError-__str__"><strong>__str__</strong></a>(...)</dt><dd><tt>x.<a href="#JSONError-__str__">__str__</a>()&nbsp;&lt;==&gt;&nbsp;str(x)</tt></dd></dl>
+
+<dl><dt><a name="JSONError-__unicode__"><strong>__unicode__</strong></a>(...)</dt></dl>
+
+<hr>
+Data descriptors inherited from <a href="exceptions.html#BaseException">exceptions.BaseException</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+</dl>
+<dl><dt><strong>args</strong></dt>
+</dl>
+<dl><dt><strong>message</strong></dt>
+</dl>
 </td></tr></table></td></tr></table><p>
 <table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
 <tr bgcolor="#eeaa77">
@@ -569,11 +684,10 @@ just&nbsp;a&nbsp;single&nbsp;character...the&nbsp;same&nbsp;one.</tt></dd></dl>
     
 <tr><td bgcolor="#55aa55"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
 <td width="100%"><strong>__author__</strong> = 'Deron Meranda &lt;http://deron.meranda.us/&gt;'<br>
-<strong>__credits__</strong> = 'Copyright (c) 2006-2008 Deron E. Meranda &lt;http:/.../licenses/&gt;<font color="#c040c0">\n</font>or &lt;http://www.fsf.org/licensing/&gt;.<font color="#c040c0">\n\n</font>'<br>
-<strong>__date__</strong> = '2008-12-17'<br>
-<strong>__version__</strong> = '1.4'<br>
+<strong>__credits__</strong> = 'Copyright (c) 2006-2010 Deron E. Meranda &lt;http:/.../licenses/&gt;<font color="#c040c0">\n</font>or &lt;http://www.fsf.org/licensing/&gt;.<font color="#c040c0">\n\n</font>'<br>
+<strong>__date__</strong> = '2010-10-10'<br>
+<strong>__version__</strong> = '1.5'<br>
 <strong>content_type</strong> = 'application/json'<br>
-<strong>decimal</strong> = None<br>
 <strong>file_ext</strong> = 'json'<br>
 <strong>float_maxexp</strong> = 307<br>
 <strong>float_sigdigits</strong> = 15<br>
@@ -598,7 +712,7 @@ just&nbsp;a&nbsp;single&nbsp;character...the&nbsp;same&nbsp;one.</tt></dd></dl>
 <font color="#ffffff" face="helvetica, arial"><big><strong>Credits</strong></big></font></td></tr>
     
 <tr><td bgcolor="#7799ee"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
-<td width="100%">Copyright&nbsp;(c)&nbsp;2006-2008&nbsp;Deron&nbsp;E.&nbsp;Meranda&nbsp;&lt;<a href="http://deron.meranda.us/">http://deron.meranda.us/</a>&gt;<br>
+<td width="100%">Copyright&nbsp;(c)&nbsp;2006-2010&nbsp;Deron&nbsp;E.&nbsp;Meranda&nbsp;&lt;<a href="http://deron.meranda.us/">http://deron.meranda.us/</a>&gt;<br>
 Licensed&nbsp;under&nbsp;GNU&nbsp;LGPL&nbsp;3.0&nbsp;(GNU&nbsp;Lesser&nbsp;General&nbsp;Public&nbsp;License)&nbsp;or<br>
 later.&nbsp;&nbsp;See&nbsp;LICENSE.txt&nbsp;included&nbsp;with&nbsp;this&nbsp;software.<br>
 &nbsp;<br>
