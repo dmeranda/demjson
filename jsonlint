@@ -6,10 +6,11 @@ Requires demjson module.
 
 """
 __author__ = "Deron Meranda <http://deron.meranda.us/>"
-__date__ = "2007-11-08"
-__version__ = "1.2"
-__credits__ = """Copyright (c) 2006-2007 Deron E. Meranda <http://deron.meranda.us/>
-Licensed under GNU GPL 3.0 or later.  See LICENSE.txt included with this software.
+__date__ = "2008-12-17"
+__version__ = "1.4"
+__credits__ = """Copyright (c) 2006-2008 Deron E. Meranda <http://deron.meranda.us/>
+Licensed under GNU LGPL (GNU Lesser General Public License) version
+3.0 or later.  See LICENSE.txt included with this software.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

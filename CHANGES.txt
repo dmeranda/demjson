@@ -1,5 +1,12 @@
 Change history for demjson python module.
 
+Version 1.4 released 2008-12-17
+
+ * Changed license to LGPL 3 (GNU Lesser General Public License) or
+   later.  Older versions still retain their original licenses.
+
+ * No changes other than relicensing were made.
+
 Version 1.3 released 2008-03-19
 
  * Change the default value of escape_unicode to False rather than

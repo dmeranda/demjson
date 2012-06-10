@@ -5,8 +5,9 @@ non-zero otherwise.  Use -v to see the warning details.
 
 Options are:
  -v | --verbose    Show details of lint checking
- -s | --strict     Be strict in what is considered legal JSON
+ -s | --strict     Be strict in what is considered legal JSON (the default)
  -S | --nonstrict  Be loose in what is considered legal JSON
+
  -f | --format     Reformat the JSON (if legal) to stdout
  -F | --format-compactly
         Reformat the JSON simlar to -f, but do so compactly by

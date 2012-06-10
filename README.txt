@@ -25,9 +25,10 @@ or from a command line:
    pydoc demjson
 
 
-This software is Free Software and is licensed under the terms
-of the GNU LGPL.  More information is found at the top of the
-demjson.py source file and the included LICENSE.txt file.
+This software is Free Software and is licensed under the terms of the
+GNU LGPL (GNU Lesser General Public License).  More information is
+found at the top of the demjson.py source file and the included
+LICENSE.txt file.
 
 Written by Deron Meranda
 http://deron.meranda.us/python/demjson/

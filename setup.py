@@ -1,7 +1,7 @@
 # -*- python -*-
 from distutils.core import setup
 name = 'demjson'
-version = '1.3'
+version = '1.4'
 setup( name=name,
        version=version,
        py_modules=[name],
@@ -21,12 +21,12 @@ setup( name=name,
         NaN and Infinity numeric types as well as it's 'undefined' type.
         It also includes a lint-like JSON syntax validator which tests JSON text
         for strict compliance to the standard.""",
-       license='GNU GPL 3.0',
+       license='GNU LGPL 3.0',
        keywords=['JSON','jsonlint','JavaScript','UTF-32'],
        platforms=[],
        classifiers=['Development Status :: 5 - Production/Stable',
                     'Intended Audience :: Developers',
-                    'License :: OSI Approved :: GNU General Public License (GPL)',
+                    'License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)',
                     'Operating System :: OS Independent',
                     'Programming Language :: Python',
                     'Topic :: Software Development :: Libraries :: Python Modules',

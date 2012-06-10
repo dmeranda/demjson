@@ -114,23 +114,25 @@ r""" A JSON data encoder and decoder.
 """
 
 __author__ = "Deron Meranda <http://deron.meranda.us/>"
-__date__ = "2008-03-19"
-__version__ = "1.3"
+__date__ = "2008-12-17"
+__version__ = "1.4"
 __credits__ = """Copyright (c) 2006-2008 Deron E. Meranda <http://deron.meranda.us/>
-Licensed under GNU GPL 3.0 or later.  See LICENSE.txt included with this software.
+Licensed under GNU LGPL 3.0 (GNU Lesser General Public License) or
+later.  See LICENSE.txt included with this software.
 
 This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+it under the terms of the GNU Lesser General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+You should have received a copy of the GNU Lesser General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>
+or <http://www.fsf.org/licensing/>.
 
 """
 
