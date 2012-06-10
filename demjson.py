@@ -87,9 +87,19 @@ r""" A JSON data encoder and decoder.
       which are treated as if they are string literals)---as permitted
       by ECMAScript.  JSON only permits strings literals as keys.
 
- Additionally, if you allow the 'octal_numbers' behavior (which is
- never enabled by default), then you can use octal integers and octal
- character escape sequences (per the ECMAScript standard Annex B.1.2)
+ Concerning non-strict and non-ECMAScript allowances:
+
+    * Octal numbers: If you allow the 'octal_numbers' behavior (which
+      is never enabled by default), then you can use octal integers
+      and octal character escape sequences (per the ECMAScript
+      standard Annex B.1.2).  This behavior is allowed, if enabled,
+      because it was valid JavaScript at one time.
+
+    * Multi-line string literals:  Strings which are more than one
+      line long (contain embedded raw newline characters) are never
+      permitted. This is neither valid JSON nor ECMAScript.  Some other
+      JSON implementations may allow this, but this module considers
+      that behavior to be a mistake.
 
  References:
     * JSON (JavaScript Object Notation)
@@ -104,8 +114,8 @@ r""" A JSON data encoder and decoder.
 """
 
 __author__ = "Deron Meranda <http://deron.meranda.us/>"
-__date__ = "2006-08-10"
-__version__ = "1.0"
+__date__ = "2006-11-06"
+__version__ = "1.1"
 __credits__ = """Copyright (c) 2006 Deron E. Meranda <http://deron.meranda.us/>
 Licensed under GNU LGPL 2.1 or later.  See <http://www.fsf.org/>.
 
@@ -187,15 +197,22 @@ def _nonnumber_float_constants():
                     def __repr__(self): return 'nan'
                     def __str__(self): return 'nan'
                     def __add__(self,x): return self
+                    def __radd__(self,x): return self
                     def __sub__(self,x): return self
+                    def __rsub__(self,x): return self
                     def __mul__(self,x): return self
+                    def __rmul__(self,x): return self
                     def __div__(self,x): return self
+                    def __rdiv__(self,x): return self
                     def __divmod__(self,x): return (self,self)
+                    def __rdivmod__(self,x): return (self,self)
                     def __mod__(self,x): return self
+                    def __rmod__(self,x): return self
+                    def __pow__(self,exp): return self
+                    def __rpow__(self,exp): return self
                     def __neg__(self): return self
                     def __pos__(self): return self
                     def __abs__(self): return self
-                    def __pow__(self,exp): return self
                     def __lt__(self,x): return False
                     def __le__(self,x): return False
                     def __eq__(self,x): return False
@@ -209,7 +226,9 @@ def _nonnumber_float_constants():
                     def __repr__(self): return 'inf'
                     def __str__(self): return 'inf'
                     def __add__(self,x): return self
+                    def __radd__(self,x): return self
                     def __sub__(self,x): return self
+                    def __rsub__(self,x): return self
                     def __mul__(self,x):
                         if x is neginf or x < 0:
                             return neginf
@@ -217,6 +236,7 @@ def _nonnumber_float_constants():
                             return nan
                         else:
                             return self
+                    def __rmul__(self,x): return self.__mul__(x)
                     def __div__(self,x):
                         if x == 0:
                             raise ZeroDivisionError('float division')
@@ -224,6 +244,10 @@ def _nonnumber_float_constants():
                             return neginf
                         else:
                             return self
+                    def __rdiv__(self,x):
+                        if x is inf or x is neginf or x is nan:
+                            return nan
+                        return 0.0
                     def __divmod__(self,x):
                         if x == 0:
                             raise ZeroDivisionError('float divmod()')
@@ -231,19 +255,34 @@ def _nonnumber_float_constants():
                             return (nan,nan)
                         else:
                             return (self,self)
+                    def __rdivmod__(self,x):
+                        if x is inf or x is neginf or x is nan:
+                            return (nan, nan)
+                        return (0.0, x)
                     def __mod__(self,x):
                         if x == 0:
                             raise ZeroDivisionError('float modulo')
                         else:
                             return nan
-                    def __neg__(self): return neginf
-                    def __pos__(self): return self
-                    def __abs__(self): return self
-                    def __pow__(self,exp):
+                    def __rmod__(self,x):
+                        if x is inf or x is neginf or x is nan:
+                            return nan
+                        return x
+                    def __pow__(self, exp):
                         if exp == 0:
                             return 1.0
                         else:
                             return self
+                    def __rpow__(self, x):
+                        if -1 < x < 1: return 0.0
+                        elif x == 1.0: return 1.0
+                        elif x is nan or x is neginf or x < 0:
+                            return nan
+                        else:
+                            return self
+                    def __neg__(self): return neginf
+                    def __pos__(self): return self
+                    def __abs__(self): return self
                     def __lt__(self,x): return False
                     def __le__(self,x):
                         if x is self:
@@ -269,7 +308,9 @@ def _nonnumber_float_constants():
                     def __repr__(self): return '-inf'
                     def __str__(self): return '-inf'
                     def __add__(self,x): return self
+                    def __radd__(self,x): return self
                     def __sub__(self,x): return self
+                    def __rsub__(self,x): return self
                     def __mul__(self,x):
                         if x is self or x < 0:
                             return inf
@@ -277,6 +318,7 @@ def _nonnumber_float_constants():
                             return nan
                         else:
                             return self
+                    def __rmul__(self,x): return self.__mul__(self)
                     def __div__(self,x):
                         if x == 0:
                             raise ZeroDivisionError('float division')
@@ -284,6 +326,10 @@ def _nonnumber_float_constants():
                             return inf
                         else:
                             return self
+                    def __rdiv__(self,x):
+                        if x is inf or x is neginf or x is nan:
+                            return nan
+                        return -0.0
                     def __divmod__(self,x):
                         if x == 0:
                             raise ZeroDivisionError('float divmod()')
@@ -291,19 +337,31 @@ def _nonnumber_float_constants():
                             return (nan,nan)
                         else:
                             return (self,self)
+                    def __rdivmod__(self,x):
+                        if x is inf or x is neginf or x is nan:
+                            return (nan, nan)
+                        return (-0.0, x)
                     def __mod__(self,x):
                         if x == 0:
                             raise ZeroDivisionError('float modulo')
                         else:
                             return nan
-                    def __neg__(self): return inf
-                    def __pos__(self): return self
-                    def __abs__(self): return inf
+                    def __rmod__(self,x):
+                        if x is inf or x is neginf or x is nan:
+                            return nan
+                        return x
                     def __pow__(self,exp):
                         if exp == 0:
                             return 1.0
                         else:
                             return self
+                    def __rpow__(self, x):
+                        if x is nan or x is inf or x is inf:
+                            return nan
+                        return 0.0
+                    def __neg__(self): return inf
+                    def __pos__(self): return self
+                    def __abs__(self): return inf
                     def __lt__(self,x): return True
                     def __le__(self,x): return True
                     def __eq__(self,x):
@@ -977,8 +1035,11 @@ class JSON(object):
             escapes = self._escapes_json
         chunks = []
         done = False
+        high_surrogate = None
         while i < len(s):
             c = s[i]
+            if high_surrogate and (i+1 >= len(s) or s[i:i+2] != '\\u'):
+                raise JSONDecodeError('High unicode surrogate must be followed by a low surrogate',s[i:])
             if c == closer:
                 i += 1 # skip end quote
                 done = True
@@ -1021,8 +1082,17 @@ class JSON(object):
                     if i+digits >= len(s):
                         raise JSONDecodeError('numeric character escape sequence is truncated',s[i-1:])
                     n = decode_hex( s[i:i+digits] )
-                    if n < 128:
+                    if high_surrogate:
+                        chunks.append( surrogate_pair_as_unicode( high_surrogate, unichr(n) ) )
+                        high_surrogate = None
+                    elif n < 128:
                         chunks.append( chr(n) )
+                    elif 0xd800 <= n <= 0xdbff: # high surrogate
+                        if len(s) < i + digits + 2 or s[i+digits] != '\\' or s[i+digits+1] != 'u':
+                            raise JSONDecodeError('High unicode surrogate must be followed by a low surrogate',s[i-2:])
+                        high_surrogate = unichr(n)  # remember until we get to the low surrogate
+                    elif 0xdc00 <= n <= 0xdfff: # low surrogate
+                        raise JSONDecodeError('Low unicode surrogate must be proceeded by a high surrogate',s[i-2:])
                     else:
                         chunks.append( unichr(n) )
                     i += digits
@@ -1057,11 +1127,21 @@ class JSON(object):
         """Encodes a Python string into a JSON string literal.
 
         """
+        # Must handle instances of UserString specially in order to be
+        # able to use ord() on it's simulated "characters".
+        import UserString
+        if isinstance(s, (UserString.UserString, UserString.MutableString)):
+            def tochar(c):
+                return c.data
+        else:
+            def tochar(c):
+                return c
+        
         chunks = []
         chunks.append('"')
         i = 0
         while i < len(s):
-            c = s[i]
+            c = tochar( s[i] )
             if self._rev_escapes.has_key(c):
                 chunks.append(self._rev_escapes[c])
                 i += 1
@@ -1069,12 +1149,12 @@ class JSON(object):
                 # contiguous runs of plain old printable ASCII
                 j=i
                 while i < len(s):
-                    c = s[i]
+                    c = tochar( s[i] )
                     if ord(c) >= 32 and ord(c) <= 128 and not self._rev_escapes.has_key(c):
                         i += 1
                     else:
                         break
-                chunks.append( s[j:i] )
+                chunks.append( unicode(s[j:i]) )
             elif ord(c) <= 0x1f:
                 # Always unicode escape control characters
                 chunks.append(r'\u%04x' % ord(c))
@@ -1361,7 +1441,7 @@ class JSON(object):
                 raise JSONEncodeError('strict JSON does not permit "undefined" values')
         elif isinstance(obj,bool):
             chunks.append(self.encode_boolean(obj))
-        elif isinstance(obj,(str,unicode)):
+        elif isstringtype(obj):
             chunks.append(self.encode_string(obj))
         elif isinstance(obj,(int,long,float)):
             chunks.append(self.encode_number(obj))
@@ -1496,6 +1576,7 @@ def encode( obj, strict=False, compactly=True, escape_unicode=True, encoding=Non
     import sys
     encoder = None # Custom codec encoding function
     bom = None  # Byte order mark to prepend to final output
+    cdk = None  # Codec to use
     if encoding is not None:
         import codecs
         try:
@@ -1506,6 +1587,8 @@ def encode( obj, strict=False, compactly=True, escape_unicode=True, encoding=Non
         if cdk:
             pass
         elif not cdk:
+            # No built-in codec was found, see if it is something we
+            # can do ourself.
             encoding = encoding.lower()
             if encoding.startswith('utf-32') \
                    or encoding.startswith('ucs4') \
@@ -1550,6 +1633,8 @@ def encode( obj, strict=False, compactly=True, escape_unicode=True, encoding=Non
                 escape_unicode = lambda c: not in_repertoire(c, encoder)
             elif cdk:
                 escape_unicode = lambda c: not in_repertoire(c, cdk[0])
+            else:
+                pass # Let the JSON object deal with it
 
     j = JSON( strict=strict, compactly=compactly, escape_unicode=escape_unicode )
 
@@ -1565,7 +1650,7 @@ def encode( obj, strict=False, compactly=True, escape_unicode=True, encoding=Non
     return txt
 
 
-def decode( txt, strict=False, encoding=None ):
+def decode( txt, strict=False, encoding=None, **kw ):
     """Decodes a JSON-encoded string into a Python object.
 
     If 'strict' is set to True, then those strings that are not
@@ -1588,32 +1673,116 @@ def decode( txt, strict=False, encoding=None ):
     detection, as with
 
         python_object = demjson.decode( input_bytes, encoding='utf8' )
+
+    Optional keywords arguments must be of the form
+        allow_xxxx=True/False
+    or
+        prevent_xxxx=True/False
+    where each will allow or prevent the specific behavior, after the
+    evaluation of the 'strict' argument.  For example, if strict=True
+    then by also passing 'allow_comments=True' then comments will be
+    allowed.  If strict=False then prevent_comments=True will allow
+    everything except comments.
+    
     """
+    # Initialize the JSON object
     j = JSON( strict=strict )
+    for keyword, value in kw.items():
+        if keyword.startswith('allow_'):
+            behavior = keyword[6:]
+            allow = bool(value)
+        elif keyword.startswith('prevent_'):
+            behavior = keyword[8:]
+            allow = not bool(value)
+        else:
+            raise ValueError('unknown keyword argument', keyword)
+        if allow:
+            j.allow(behavior)
+        else:
+            j.prevent(behavior)
+
+    # Convert the input string into unicode if needed.
     if isinstance(txt,unicode):
         unitxt = txt
     else:
         if encoding is None:
             unitxt = auto_unicode_decode( txt )
         else:
+            cdk = None # codec
+            decoder = None
             import codecs
             try:
                 cdk = codecs.lookup(encoding)
             except LookupError:
+                encoding = encoding.lower()
+                decoder = None
+                if encoding.startswith('utf-32') \
+                       or encoding.startswith('ucs4') \
+                       or encoding.startswith('ucs-4'):
+                    # Python doesn't natively have a UTF-32 codec, but JSON
+                    # requires that it be supported.  So we must decode these
+                    # manually.
+                    if encoding.endswith('le'):
+                        decoder = utf32le_decode
+                    elif encoding.endswith('be'):
+                        decoder = utf32be_decode
+                    else:
+                        if txt.startswith( codecs.BOM_UTF32_BE ):
+                            decoder = utf32be_decode
+                            txt = txt[4:]
+                        elif txt.startswith( codecs.BOM_UTF32_LE ):
+                            decoder = utf32le_decode
+                            txt = txt[4:]
+                        else:
+                            if encoding.startswith('ucs'):
+                                raise JSONDecodeError('UCS-4 encoded string must start with a BOM')
+                            decoder = utf32be_decode # Default BE for UTF, per unicode spec
+                elif encoding.startswith('ucs2') or encoding.startswith('ucs-2'):
+                    # Python has no UCS-2, but we can simulate with
+                    # UTF-16.  We just need to force us to not try to
+                    # encode anything past the BMP.
+                    encoding = 'utf-16'
+
+            if decoder:
+                unitxt = decoder(txt)
+            elif encoding:
+                unitxt = txt.decode(encoding)
+            else:
                 raise JSONDecodeError('this python has no codec for this character encoding',encoding)
-            unitxt = txt.decode(encoding)
+
         # Check that the decoding seems sane.  Per RFC 4627 section 3:
         #    "Since the first two characters of a JSON text will
         #    always be ASCII characters [RFC0020], ..."
-        # However that seems to be an incorrect statement as a JSON
-        # string literal may have as it's first character any unicode
-        # character.  Thus the first two characters will always be
-        # ASCII, unless the first character is a quotation mark.
-
-        if len(unitxt) > 2 and unitxt[0] not in '"\'' and \
-               ( ord(unitxt[0]) < 0x20 or ord(unitxt[0]) > 0x7f or \
-                 ord(unitxt[1]) < 0x20 or ord(unitxt[1]) > 0x7f ):
-                raise JSONDecodeError('the decoded string is gibberish, is the encoding correct?',encoding)
+        #
+        # This check is probably not necessary, but it allows us to
+        # raise a suitably descriptive error rather than an obscure
+        # syntax error later on.
+        #
+        # Note that the RFC requirements of two ASCII characters seems
+        # to be an incorrect statement as a JSON string literal may
+        # have as it's first character any unicode character.  Thus
+        # the first two characters will always be ASCII, unless the
+        # first character is a quotation mark.  And in non-strict
+        # mode we can also have a few other characters too.
+        if len(unitxt) > 2:
+            first, second = unitxt[:2]
+            if first in '"\'':
+                pass # second can be anything inside string literal
+            else:
+                if ((ord(first) < 0x20 or ord(first) > 0x7f) or \
+                    (ord(second) < 0x20 or ord(second) > 0x7f)) and \
+                    (not j.isws(first) and not j.isws(second)):
+                    # Found non-printable ascii, must check unicode
+                    # categories to see if the character is legal.
+                    # Only whitespace, line and paragraph separators,
+                    # and format control chars are legal here.
+                    import unicodedata
+                    catfirst = unicodedata.category(unicode(first))
+                    catsecond = unicodedata.category(unicode(second))
+                    if catfirst not in ('Zs','Zl','Zp','Cf') or \
+                           catsecond not in ('Zs','Zl','Zp','Cf'):
+                        raise JSONDecodeError('the decoded string is gibberish, is the encoding correct?',encoding)
+    # Now ready to do the actual decoding
     obj = j.decode( unitxt )
     return obj
 

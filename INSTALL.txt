@@ -1,0 +1,18 @@
+To install, type:
+
+    python setup.py install
+
+Optionally you can also just copy the "demjson.py" file into
+your own project's directory.
+
+This software is also published in the Python Cheeseshop.  So
+you may be able to install it by using:
+
+   easy_install demjson
+
+
+Self tests are included which conform to the Python unittest
+framework.  To run these tests, do
+
+    cd test
+    PYTHONPATH=.. python test_demjson.py

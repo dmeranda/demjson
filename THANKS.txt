@@ -1,0 +1,7 @@
+In general thanks to the entire Python community for providing such
+a wonderful language.  Thanks also to the folks at json.org for
+developing the JSON data format and pursuing an RFC standard for it.
+
+Reported bugs:
+  * Adam Braun -- reported bug in 1.0 release regarding newlines being
+        rejected during decoding if at the beginning of the input.

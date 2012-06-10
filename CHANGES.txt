@@ -1,0 +1,35 @@
+Version 1.1 released 2006-11-06
+ * Extensive self testing code is now included, conforming to the
+   standard Python unittest framework.  See the INSTALL.txt file for
+   instructions.
+
+ * Corrected character encoding sanity check which would erroneously
+   complain if the input contained a newline or tab character within
+   the first two characters.
+
+ * The decode() and encode() top-level functions now allow additional
+   keyword arguments to turn specific behaviors on or off that
+   previously could only be done using the JSON class directly.  The
+   keyword arguments look like 'allow_comments=True'.  Read the
+   function docstrings for more information on this enhancement.
+
+ * The decoding of supplementary Unicode character escape sequences
+   (such as "\ud801\udc02") was broken on some versions of Python.
+   These are now decoded explicitly without relying on Python so they
+   always work.
+
+ * Some Unicode encoding and decoding with UCS-4 or UTF-32 were not
+   handled correctly.
+
+ * Encoding of pseudo-string types from the UserString module are
+   now correctly encoded as if real strings.
+
+ * Improved simulation of nan, inf, and neginf classes used if the
+   Python interpreter doesn't support IEEE 754 floating point math.
+
+ * Updated the documentation to describe why this module does not
+   permit multi-line string literals.
+
+
+Version 1.0 released 2006-08-10
+ * Initial public release

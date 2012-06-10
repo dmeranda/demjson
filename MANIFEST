@@ -1,0 +1,13 @@
+AUTHORS.txt
+CHANGES.txt
+docs/demjson.html
+docs/demjson.txt
+INSTALL.txt
+LICENSE.txt
+NEWS.txt
+MANIFEST
+README.txt
+THANKS.txt
+demjson.py
+setup.py
+test/test_demjson.py
