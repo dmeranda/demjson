@@ -1,12 +1,15 @@
-Usage: jsonlint [-v] [-s|-S] [-f|-F] [-e codec] inputfile.json ...
+Usage: jsonlint [<options> ...] inputfile.json ...
 
-There is NO OUTPUT by default. Use -v to see any warning details.
+With no input filename, or "-", it will read from standard input.
 
 The return status will be 0 if the file is conforming JSON (per the
 RFC 7158 specification), or non-zero otherwise.
 
-Options are:
+OPTIONS:
+
  -v | --verbose    Show details of lint checking
+ -q | --quiet      Don't show any warnings
+
  -s | --strict     Be strict in what is considered conforming JSON (the default)
  -S | --nonstrict  Be loose in what is considered conforming JSON
 
@@ -14,24 +17,40 @@ Options are:
  -F | --format-compactly
         Reformat the JSON simlar to -f, but do so compactly by
         removing all unnecessary whitespace
+ -o filename | --output filename
+        The filename to which reformatted JSON is to be written.
+        Without this option the standard output is used.
 
- -e codec | --encoding=codec
- --input-encoding=codec
- --output-encoding=codec
-         Set the input and output character encoding codec (e.g.,
-         ascii, utf8, utf-16).  The -e will set both the input and
-         output encodings to the same thing.  If not supplied, the
-         input encoding is guessed according to the JSON
-         specification.  The output encoding defaults to UTF-8, and is
-         used when reformatting (via the -f or -F options).
+UNICODE OPTIONS:
 
-When reformatting, all members of objects (associative arrays) are
-always output in lexigraphical sort order.  The default output codec
-is UTF-8, unless the -e option is provided.  Any Unicode characters
-will be output as literal characters if the encoding permits,
-otherwise they will be \u-escaped.  You can use "-e ascii" to force
-all Unicode characters to be escaped.
+ -e codec | --encoding=codec     Set both input and output encodings
+ --input-encoding=codec          Set the input encoding
+ --output-encoding=codec         Set the output encoding
 
-Use 'jsonlint --version' to see versioning information.
-Use 'jsonlint --copyright' to see author and copyright details.'
+    These options set the character encoding codec (e.g., "ascii",
+    "utf-8", "utf-16").  The -e will set both the input and output
+    encodings to the same thing.  The output encoding is used when
+    reformatting with the -f or -F options.
 
+    Unless set, the input encoding is guessed and the output
+    encoding will be "utf-8".
+
+REFORMATTING:
+
+    When reformatting JSON with -f or -F, output is only produced if
+    the input passed validation.  By default the reformatted JSON will
+    be written to standard output, unless the -o option was given.
+
+    The default output codec is UTF-8, unless an encoding option is
+    provided.  Any Unicode characters will be output as literal
+    characters if the encoding permits, otherwise they will be
+    \u-escaped.  You can use "--output-encoding ascii" to force all
+    Unicode characters to be escaped.
+
+MORE INFORMATION:
+
+    Use 'jsonlint --version [-v]' to see versioning information.
+    Use 'jsonlint --copyright' to see author and copyright details.'
+
+    jsonlint is distributed as part of the "demjson" Python module.
+    See http://deron.meranda.us/python/demjson/

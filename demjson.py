@@ -1735,6 +1735,8 @@ class JSON(object):
         """
         chunks = []
         self.encode_helper(chunks, obj, nest_level)
+        if nest_level == 0 and not self._encode_compactly:
+            chunks.append( u"\n" )
         return ''.join( chunks )
 
     def encode_helper(self, chunklist, obj, nest_level):
