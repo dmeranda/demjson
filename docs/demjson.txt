@@ -722,13 +722,13 @@ DATA
     __author__ = 'Deron Meranda <http://deron.meranda.us/>'
     __credits__ = 'Copyright (c) 2006-2014 Deron E. Meranda <http:/.../lic...
     __date__ = '2014-04-13'
+    __homepage__ = 'http://deron.meranda.us/python/demjson/'
     __version__ = '1.7'
     content_type = 'application/json'
     file_ext = 'json'
     float_maxexp = 307
     float_sigdigits = 14
     hexdigits = '0123456789ABCDEFabcdef'
-    i = 31
     inf = inf
     nan = nan
     neginf = -inf

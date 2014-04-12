@@ -39,16 +39,20 @@ to repair its RFC issues).
 For MOST uses, the standard Python JSON library should be sufficient.
 
 However demjson may still be useful. In particular it in general has
-better error handling and "lint" checking capabilities.
+better error handling and "lint" checking capabilities.  It also can
+correctly deal with different Unicode encodings, including ASCII.
 
 
 More information
 ================
+See the files under the "docs" subdirectory.
+
 Complete documentation and additional information is available on the
 [demjson project homepage](http://deron.meranda.us/python/demjson/).
 
 It is also available on the
 [Python Package Index](http://pypi.python.org/pypi/demjson/).
+
 
 License
 =======

@@ -116,6 +116,7 @@ r""" A JSON data encoder and decoder.
 __author__ = "Deron Meranda <http://deron.meranda.us/>"
 __date__ = "2014-04-13"
 __version__ = "1.7"
+__homepage__ = "http://deron.meranda.us/python/demjson/"
 __credits__ = """Copyright (c) 2006-2014 Deron E. Meranda <http://deron.meranda.us/>
 
 Licensed under GNU LGPL (GNU Lesser General Public License) version 3.0
@@ -490,7 +491,8 @@ del _nonnumber_float_constants
 # ----------------------------------------------------------------------
 # String processing helpers
 
-unsafe_string_chars = '"\\' + ''.join([chr(i) for i in range(0x20)])
+unsafe_string_chars = '"\\' + ''.join([chr(_i) for _i in range(0x20)])
+del _i
 def skipstringsafe( s, start=0, end=None ):
     i = start
     #if end is None:

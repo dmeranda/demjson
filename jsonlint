@@ -8,6 +8,7 @@ Requires demjson module.
 __author__ = "Deron Meranda <http://deron.meranda.us/>"
 __date__ = "2014-04-13"
 __version__ = "1.7"
+__homepage__ = "http://deron.meranda.us/python/demjson/"
 __credits__ = """Copyright (c) 2006-2014 Deron E. Meranda <http://deron.meranda.us/>
 
 Licensed under GNU LGPL (GNU Lesser General Public License) version 3.0
@@ -166,7 +167,7 @@ MORE INFORMATION:
     Use '%(program_name)s --copyright' to see author and copyright details.'
 
     %(program_name)s is distributed as part of the "demjson" Python module.
-    See http://deron.meranda.us/python/demjson/
+    See %(homepage)s
 """
 
 def main( args ):
@@ -202,7 +203,7 @@ def main( args ):
     # Process all options
     for opt, val in opts:
         if opt in ('-h', '--help'):
-            sys.stdout.write( main_usage % {'program_name':program_name} )
+            sys.stdout.write( main_usage % {'program_name':program_name, 'homepage':__homepage__} )
             return 0
         elif opt == '--version':
             sys.stdout.write( '%s version %s (%s)\n' % (program_name, __version__, __date__) )
@@ -215,7 +216,7 @@ def main( args ):
             return 0
         elif opt == '--copyright':
             sys.stdout.write( "%s is distributed as part of the \"demjson\" python package.\n", (program_name,) )
-            sys.stdout.write( "See http://deron.meranda.us/python/demjson/\n\n\n" )
+            sys.stdout.write( "See %s\n\n\n" % (__homepage__,) )
             sys.stdout.write( __credits__ )
             return 0
         elif opt in ('-v', '--verbose'):

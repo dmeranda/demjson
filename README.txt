@@ -1,11 +1,23 @@
 demjson
 =======
 
+MORE DOCUMENTATION IS IN THE "docs" SUBDIRECTORY.
+
 'demjson' is a Python language module for encoding, decoding, and
 syntax-checking JSON data.
 
-Additional documentation may be found under the "docs/" directory.
 
+It attempts to be as closely conforming to the JSON specification,
+published as IETF RFC 7158 <http://www.ietf.org/rfc/rfc7158.txt>, as
+possible.  It can also be used in a non-strict mode where it is much
+closer to the JavaScript/ECMAScript syntax (published as ECMA 262).
+The demjson module has full Unicode support and can deal with very
+large numbers.
+
+It comes with a <b>jsonlint</b> tool which can be used to validate
+your JSON documents for strict conformance to the RFC specification;
+as it can also reformat them, either by re-indenting or removing
+unnecessary whitespace for minimal/canonical JSON output.
 
 Why demjson?
 ============
@@ -29,13 +41,14 @@ to repair its RFC issues).
 For MOST uses, the standard Python JSON library should be sufficient.
 
 However demjson may still be useful. In particular it in general has
-better error handling and "lint" checking capabilities.
+better error handling and "lint" checking capabilities.  It also can
+correctly deal with different Unicode encodings, including ASCII.
 
 
 Compatibility
 =============
 
-   REQUIRES PYTHON 2.3 OR HIGHER, DOES NOT WORK IN PYTHON 3000 (3.x)
+REQUIRES PYTHON 2.3 OR HIGHER, DOES NOT WORK IN PYTHON 3000 (3.x)
 
 
 Installation
@@ -65,12 +78,31 @@ or from a command line:
    pydoc demjson
 
 
+Running self tests
+==================
+To run the accompaning self-tests, under the test/ subdirectory, do:
+
+   cd test
+   PYTHONPATH=.. python test_demjson.py
+
+
 License
 =======
 This software is Free Software and is licensed under the terms of the
 GNU LGPL (GNU Lesser General Public License).  More information is
 found at the top of the demjson.py source file and the included
 LICENSE.txt file.
+
+
+More information
+================
+See the files under the "docs" subdirectory.
+
+Complete documentation and additional information is available on the
+project homepage at http://deron.meranda.us/python/demjson/
+
+It is also available on the Python Package Index at
+http://pypi.python.org/pypi/demjson/
 
 
 Author
