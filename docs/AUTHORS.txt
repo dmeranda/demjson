@@ -1,4 +1,13 @@
-In general thanks to the entire Python community for providing such
+AUTHORS
+=======
+Authors of the demjson python module:
+
+* Deron Meranda <deron.meranda@gmail.com>
+
+
+THANKS and MENTIONS
+===================
+In general, thanks to the entire Python community for providing such
 a wonderful language.  Thanks also to the folks at json.org for
 developing the JSON data format and pursuing an RFC standard for it.
 

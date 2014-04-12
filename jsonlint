@@ -8,7 +8,7 @@ Requires demjson module.
 __author__ = "Deron Meranda <http://deron.meranda.us/>"
 __date__ = "2014-04-13"
 __version__ = "1.7"
-__credits__ = """Copyright (c) 2006-2011 Deron E. Meranda <http://deron.meranda.us/>
+__credits__ = """Copyright (c) 2006-2014 Deron E. Meranda <http://deron.meranda.us/>
 
 Licensed under GNU LGPL (GNU Lesser General Public License) version 3.0
 or later.  See LICENSE.txt included with this software.

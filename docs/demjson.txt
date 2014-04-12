@@ -71,7 +71,7 @@ DESCRIPTION
     
     When decoding strings with this module it may operate in either
     strict or non-strict mode.  The strict mode only allows syntax which
-    is conforming to RFC 4627 (JSON), while the non-strict allows much
+    is conforming to RFC 7158 (JSON), while the non-strict allows much
     more of the permissible ECMAScript syntax.
     
     The following are permitted when processing in NON-STRICT mode:
@@ -108,8 +108,8 @@ DESCRIPTION
     References:
        * JSON (JavaScript Object Notation)
          <http://json.org/>
-       * RFC 4627. The application/json Media Type for JavaScript Object Notation (JSON)
-         <http://www.ietf.org/rfc/rfc4627.txt>
+       * RFC 7158. The application/json Media Type for JavaScript Object Notation (JSON)
+         <http://www.ietf.org/rfc/rfc7158.txt>
        * ECMA-262 3rd edition (1999)
          <http://www.ecma-international.org/publications/files/ecma-st/ECMA-262.pdf>
        * IEEE 754-1985: Standard for Binary Floating-Point Arithmetic.
@@ -371,7 +371,7 @@ CLASSES
      |      List of known behaviors that are currently prevented
      |  
      |  strict
-     |      True if adherence to RFC 4627 syntax is strict, or False is more generous ECMAScript syntax is permitted
+     |      True if adherence to RFC 7158 syntax is strict, or False is more generous ECMAScript syntax is permitted
     
     class JSONDecodeError(JSONError)
      |  An exception class raised when a JSON decoding error (syntax error) occurs.
@@ -399,7 +399,7 @@ CLASSES
      |  Methods inherited from exceptions.ValueError:
      |  
      |  __init__(...)
-     |      x.__init__(...) initializes x; see x.__class__.__doc__ for signature
+     |      x.__init__(...) initializes x; see help(type(x)) for signature
      |  
      |  ----------------------------------------------------------------------
      |  Data and other attributes inherited from exceptions.ValueError:
@@ -474,7 +474,7 @@ CLASSES
      |  Methods inherited from exceptions.ValueError:
      |  
      |  __init__(...)
-     |      x.__init__(...) initializes x; see x.__class__.__doc__ for signature
+     |      x.__init__(...) initializes x; see help(type(x)) for signature
      |  
      |  ----------------------------------------------------------------------
      |  Data and other attributes inherited from exceptions.ValueError:
@@ -548,7 +548,7 @@ CLASSES
      |  Methods inherited from exceptions.ValueError:
      |  
      |  __init__(...)
-     |      x.__init__(...) initializes x; see x.__class__.__doc__ for signature
+     |      x.__init__(...) initializes x; see help(type(x)) for signature
      |  
      |  ----------------------------------------------------------------------
      |  Data and other attributes inherited from exceptions.ValueError:
@@ -604,7 +604,7 @@ FUNCTIONS
         This will return a Python unicode string type corresponding to the
         input string (either str or unicode).  The character encoding is
         guessed by looking for either a Unicode BOM prefix, or by the
-        rules specified by RFC 4627.  When in doubt it is assumed the
+        rules specified by RFC 7158.  When in doubt it is assumed the
         input is encoded in UTF-8 (the default for JSON).
     
     decode(txt, strict=False, encoding=None, **kw)
@@ -720,9 +720,9 @@ FUNCTIONS
 
 DATA
     __author__ = 'Deron Meranda <http://deron.meranda.us/>'
-    __credits__ = 'Copyright (c) 2006-2011 Deron E. Meranda <http:/.../lic...
-    __date__ = '2011-04-01'
-    __version__ = '1.6'
+    __credits__ = 'Copyright (c) 2006-2014 Deron E. Meranda <http:/.../lic...
+    __date__ = '2014-04-13'
+    __version__ = '1.7'
     content_type = 'application/json'
     file_ext = 'json'
     float_maxexp = 307
@@ -737,16 +737,16 @@ DATA
     unsafe_string_chars = '"\\\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b...
 
 VERSION
-    1.6
+    1.7
 
 DATE
-    2011-04-01
+    2014-04-13
 
 AUTHOR
     Deron Meranda <http://deron.meranda.us/>
 
 CREDITS
-    Copyright (c) 2006-2011 Deron E. Meranda <http://deron.meranda.us/>
+    Copyright (c) 2006-2014 Deron E. Meranda <http://deron.meranda.us/>
     
     Licensed under GNU LGPL (GNU Lesser General Public License) version 3.0
     or later.  See LICENSE.txt included with this software.

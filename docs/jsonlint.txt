@@ -3,7 +3,7 @@ Usage: jsonlint [-v] [-s|-S] [-f|-F] [-e codec] inputfile.json ...
 There is NO OUTPUT by default. Use -v to see any warning details.
 
 The return status will be 0 if the file is conforming JSON (per the
-RFC 4627 specification), or non-zero otherwise.
+RFC 7158 specification), or non-zero otherwise.
 
 Options are:
  -v | --verbose    Show details of lint checking

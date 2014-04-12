@@ -6,6 +6,8 @@ Version 1.7 released 2014-04-13
    the constraint that a JSON document must start with an object or
    array.  Now any JSON value type is a legal JSON document.
 
+ * The "jsonlint" script command will now be installed by default.
+
 Version 1.6 released 2011-04-01
 
  * Bug fix. The jsonlint tool failed to accept a JSON document from

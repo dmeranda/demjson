@@ -1,3 +1,0 @@
-Authors of the demjson python module.
-
-* Deron Meranda <deron.meranda@gmail.com>
