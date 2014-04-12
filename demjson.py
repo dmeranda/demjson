@@ -67,7 +67,7 @@ r""" A JSON data encoder and decoder.
  
  When decoding strings with this module it may operate in either
  strict or non-strict mode.  The strict mode only allows syntax which
- is conforming to RFC 4627 (JSON), while the non-strict allows much
+ is conforming to RFC 7158 (JSON), while the non-strict allows much
  more of the permissible ECMAScript syntax.
 
  The following are permitted when processing in NON-STRICT mode:
@@ -104,8 +104,8 @@ r""" A JSON data encoder and decoder.
  References:
     * JSON (JavaScript Object Notation)
       <http://json.org/>
-    * RFC 4627. The application/json Media Type for JavaScript Object Notation (JSON)
-      <http://www.ietf.org/rfc/rfc4627.txt>
+    * RFC 7158. The application/json Media Type for JavaScript Object Notation (JSON)
+      <http://www.ietf.org/rfc/rfc7158.txt>
     * ECMA-262 3rd edition (1999)
       <http://www.ecma-international.org/publications/files/ecma-st/ECMA-262.pdf>
     * IEEE 754-1985: Standard for Binary Floating-Point Arithmetic.
@@ -114,8 +114,8 @@ r""" A JSON data encoder and decoder.
 """
 
 __author__ = "Deron Meranda <http://deron.meranda.us/>"
-__date__ = "2011-04-01"
-__version__ = "1.6"
+__date__ = "2014-04-13"
+__version__ = "1.7"
 __credits__ = """Copyright (c) 2006-2011 Deron E. Meranda <http://deron.meranda.us/>
 
 Licensed under GNU LGPL (GNU Lesser General Public License) version 3.0
@@ -620,7 +620,7 @@ def auto_unicode_decode( s ):
     This will return a Python unicode string type corresponding to the
     input string (either str or unicode).  The character encoding is
     guessed by looking for either a Unicode BOM prefix, or by the
-    rules specified by RFC 4627.  When in doubt it is assumed the
+    rules specified by RFC 7158.  When in doubt it is assumed the
     input is encoded in UTF-8 (the default for JSON).
 
     """
@@ -915,7 +915,7 @@ class JSON(object):
 
         Pass True to be very strict about JSON syntax, or False to be looser.
         """
-        self._allow_any_type_at_start = not strict
+        self._allow_any_type_at_start = True    # Changed in RFC 7158 (was 'not strict')
         self._allow_all_numeric_signs = not strict
         self._allow_comments = not strict
         self._allow_control_char_in_string = not strict
@@ -983,7 +983,7 @@ class JSON(object):
     def _is_strict(self):
         return not self.allowed_behaviors
     strict = property(_is_strict, _set_strictness,
-                      doc='True if adherence to RFC 4627 syntax is strict, or False is more generous ECMAScript syntax is permitted')
+                      doc='True if adherence to RFC 7158 syntax is strict, or False is more generous ECMAScript syntax is permitted')
 
 
     def isws(self, c):
@@ -2103,6 +2103,7 @@ def decode( txt, strict=False, encoding=None, **kw ):
         # Check that the decoding seems sane.  Per RFC 4627 section 3:
         #    "Since the first two characters of a JSON text will
         #    always be ASCII characters [RFC0020], ..."
+        # [WAS removed from RFC 7158, but still valid via the grammar.]
         #
         # This check is probably not necessary, but it allows us to
         # raise a suitably descriptive error rather than an obscure

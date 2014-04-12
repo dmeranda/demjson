@@ -6,8 +6,8 @@ Requires demjson module.
 
 """
 __author__ = "Deron Meranda <http://deron.meranda.us/>"
-__date__ = "2011-04-01"
-__version__ = "1.6"
+__date__ = "2014-04-13"
+__version__ = "1.7"
 __credits__ = """Copyright (c) 2006-2011 Deron E. Meranda <http://deron.meranda.us/>
 
 Licensed under GNU LGPL (GNU Lesser General Public License) version 3.0
@@ -86,7 +86,7 @@ main_usage = """Usage: jsonlint [-v] [-s|-S] [-f|-F] [-e codec] inputfile.json .
 There is NO OUTPUT by default. Use -v to see any warning details.
 
 The return status will be 0 if the file is conforming JSON (per the
-RFC 4627 specification), or non-zero otherwise.
+RFC 7158 specification), or non-zero otherwise.
 
 Options are:
  -v | --verbose    Show details of lint checking
