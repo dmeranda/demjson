@@ -374,12 +374,14 @@ class DemjsonTest(unittest.TestCase):
         self.assertRaises(demjson.JSONDecodeError, demjson.decode, u'\u00a0[]', strict=True)
 
     def testDecodeInvalidStartingType(self):
-        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '', strict=True)
-        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '1', strict=True)
-        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '1.5', strict=True)
-        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '"a"', strict=True)
-        self.assertRaises(demjson.JSONDecodeError, demjson.decode, 'true', strict=True)
-        self.assertRaises(demjson.JSONDecodeError, demjson.decode, 'null', strict=True)
+        if False:
+            # THESE TESTS NO LONGER APPLY WITH RFC 7158, WHICH SUPERSEDED RFC 4627
+            self.assertRaises(demjson.JSONDecodeError, demjson.decode, '', strict=True)
+            self.assertRaises(demjson.JSONDecodeError, demjson.decode, '1', strict=True)
+            self.assertRaises(demjson.JSONDecodeError, demjson.decode, '1.5', strict=True)
+            self.assertRaises(demjson.JSONDecodeError, demjson.decode, '"a"', strict=True)
+            self.assertRaises(demjson.JSONDecodeError, demjson.decode, 'true', strict=True)
+            self.assertRaises(demjson.JSONDecodeError, demjson.decode, 'null', strict=True)
 
     def testDecodeMixed(self):
         self.assertEqual(demjson.decode('[0.5,{"3e6":[true,"d{["]}]'), \
