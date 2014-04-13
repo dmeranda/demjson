@@ -216,6 +216,12 @@ class DemjsonTest(unittest.TestCase):
                      in ['\x00\x00\xfe\xff\x00\x00\x00"\x00\x00\x00\xe0\x00\x00\x00"',
                          '\xff\xfe\x00\x00"\x00\x00\x00\xe0\x00\x00\x00"\x00\x00\x00'] )
 
+    def testEncodeStringWithLineTerminators(self):
+        self.assertEqual(demjson.encode(u'\u2028', escape_unicode=False, encoding='utf-8'),
+                         '"\\u2028"')
+        self.assertEqual(demjson.encode(u'\u2029', escape_unicode=False, encoding='utf-8'),
+                         '"\\u2029"')
+
     def testDecodeSupplementalUnicode(self):
         import sys
         if sys.maxunicode > 65535:

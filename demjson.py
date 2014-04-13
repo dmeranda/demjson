@@ -1429,8 +1429,8 @@ class JSON(object):
                 # Has a shortcut escape sequence, like "\n"
                 chunks.append(revesc[c])
                 i += 1
-            elif cord <= 0x1F:
-                # Always unicode escape ASCII-control characters
+            elif cord <= 0x1F or self.islineterm(c):
+                # Always unicode escape ASCII-control characters or line terminators
                 chunks.append(r'\u%04x' % cord)
                 i += 1
             elif 0xD800 <= cord <= 0xDFFF:

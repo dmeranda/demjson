@@ -6,7 +6,14 @@ Version 1.7 released 2014-04-13
    the constraint that a JSON document must start with an object or
    array.  Now any JSON value type is a legal JSON document.
 
- * The "jsonlint" script command will now be installed by default.
+ * When outputting JSON any Unicode line terminator characters will
+   always be \u-escaped.  This is to increase compatibility with
+   JavaScript which forbids them in string literals.  It includes the
+   characters:
+       - U+2028  LINE SEPARATOR  (Category Zl)
+       - U+2029  PARAGRAPH SEPARATOR  (Category Zp)
+
+ * The "jsonlint" command script will now be installed by default.
 
  * jsonlint improvements:
        - Fixed reading from stdin
