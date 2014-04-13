@@ -6,6 +6,8 @@
 
 import sys, os, time
 import unittest
+import string
+import unicodedata
 
 # Force PYTHONPATH to head of sys.path, as the easy_install (egg files) will
 # have rudely forced itself ahead of PYTHONPATH.
@@ -15,6 +17,13 @@ for pos, name in enumerate(os.environ.get('PYTHONPATH','').split(os.pathsep)):
         sys.path.insert(pos, name)
 
 import demjson
+
+def rawbytes( byte_list ):
+    if sys.version_info.major >= 3:
+        b = bytes( byte_list )
+    else:
+        b = ''.join(chr(n) for n in byte_list)
+    return b
 
 class DemjsonTest(unittest.TestCase):
     """This class contains test cases for demjson.
@@ -190,58 +199,87 @@ class DemjsonTest(unittest.TestCase):
         self.assertEqual(demjson.encode('\0', escape_unicode=True), r'"\u0000"')
         self.assertEqual(demjson.encode(u'\u00e0', escape_unicode=True), r'"\u00e0"')
         self.assertEqual(demjson.encode(u'\u2012', escape_unicode=True), r'"\u2012"')
-
+        
     def testDecodeStringRawUnicode(self):
-        self.assertEqual(demjson.decode('"\xc3\xa0"', encoding='utf-8'), u'\u00e0')
-
-        self.assertEqual(demjson.decode('"\x00\x00\x00\xe0\x00\x00\x00"\x00\x00\x00',
+        QT = ord('"')
+        self.assertEqual(demjson.decode(rawbytes([ QT,0xC3,0xA0,QT ]),
+                                        encoding='utf-8'), u'\u00e0')
+        self.assertEqual(demjson.decode(rawbytes([ QT,0,0,0, 0xE0,0,0,0, QT,0,0,0 ]),
                                         encoding='ucs4le'), u'\u00e0')
-        self.assertEqual(demjson.decode('\x00\x00\x00"\x00\x00\x00\xe0\x00\x00\x00"',
+        self.assertEqual(demjson.decode(rawbytes([ 0,0,0,QT, 0,0,0,0xE0, 0,0,0,QT ]),
                                         encoding='ucs4be'), u'\u00e0')
-        self.assertEqual(demjson.decode('\x00\x00\x00"\x00\x00\x00\xe0\x00\x00\x00"',
+        self.assertEqual(demjson.decode(rawbytes([ 0,0,0,QT, 0,0,0,0xE0, 0,0,0,QT ]),
                                         encoding='utf-32be'), u'\u00e0')
-        self.assertEqual(demjson.decode('\x00\x00\xfe\xff\x00\x00\x00"\x00\x00\x00\xe0\x00\x00\x00"',
+        self.assertEqual(demjson.decode(rawbytes([ 0,0,0xFE,0xFF, 0,0,0,QT, 0,0,0,0xE0, 0,0,0,QT ]),
                                         encoding='ucs4'), u'\u00e0')
 
     def testEncodeStringRawUnicode(self):
+        QT = ord('"')
         self.assertEqual(demjson.encode(u'\u00e0', escape_unicode=False, encoding='utf-8'),
-                         '"\xc3\xa0"')
+                         rawbytes([ QT, 0xC3, 0xA0, QT ]) )
         self.assertEqual(demjson.encode(u'\u00e0', escape_unicode=False, encoding='ucs4le'),
-                         '"\x00\x00\x00\xe0\x00\x00\x00"\x00\x00\x00')
+                         rawbytes([ QT,0,0,0, 0xE0,0,0,0, QT,0,0,0 ]) )
         self.assertEqual(demjson.encode(u'\u00e0', escape_unicode=False, encoding='ucs4be'),
-                         '\x00\x00\x00"\x00\x00\x00\xe0\x00\x00\x00"')
+                         rawbytes([ 0,0,0,QT, 0,0,0,0xE0, 0,0,0,QT ]) )
         self.assertEqual(demjson.encode(u'\u00e0', escape_unicode=False, encoding='utf-32be'),
-                         '\x00\x00\x00"\x00\x00\x00\xe0\x00\x00\x00"')
+                         rawbytes([ 0,0,0,QT, 0,0,0,0xE0, 0,0,0,QT ]) )
         self.assert_(demjson.encode(u'\u00e0', escape_unicode=False, encoding='ucs4')
-                     in ['\x00\x00\xfe\xff\x00\x00\x00"\x00\x00\x00\xe0\x00\x00\x00"',
-                         '\xff\xfe\x00\x00"\x00\x00\x00\xe0\x00\x00\x00"\x00\x00\x00'] )
+                     in [rawbytes([ 0,0,0xFE,0xFF, 0,0,0,QT, 0,0,0,0xE0, 0,0,0,QT ]),
+                         rawbytes([ 0xFF,0xFE,0,0, QT,0,0,0, 0xE0,0,0,0, QT,0,0,0 ]) ])
 
-    def testEncodeStringWithLineTerminators(self):
+    def testEncodeStringWithSpecials(self):
+        # Make sure that certain characters are always \u-encoded even if the
+        # output encoding could have represented them in the raw.
+
+        # Test U+001B escape - a control character
+        self.assertEqual(demjson.encode(u'\u001B', escape_unicode=False, encoding='utf-8'),
+                         rawbytes([ ord(c) for c in '"\\u001b"' ]) )
+        # Test U+007F delete - a control character
+        self.assertEqual(demjson.encode(u'\u007F', escape_unicode=False, encoding='utf-8'),
+                         rawbytes([ ord(c) for c in '"\\u007f"' ]) )
+        # Test U+00AD soft hyphen - a format control character
+        self.assertEqual(demjson.encode(u'\u00AD', escape_unicode=False, encoding='utf-8'),
+                         rawbytes([ ord(c) for c in '"\\u00ad"' ]) )
+        # Test U+200F right-to-left mark
+        self.assertEqual(demjson.encode(u'\u200F', escape_unicode=False, encoding='utf-8'),
+                         rawbytes([ ord(c) for c in '"\\u200f"' ]) )
+        # Test U+2028 line separator
         self.assertEqual(demjson.encode(u'\u2028', escape_unicode=False, encoding='utf-8'),
-                         '"\\u2028"')
+                         rawbytes([ ord(c) for c in '"\\u2028"' ]) )
+        # Test U+2029 paragraph separator
         self.assertEqual(demjson.encode(u'\u2029', escape_unicode=False, encoding='utf-8'),
-                         '"\\u2029"')
+                         rawbytes([ ord(c) for c in '"\\u2029"' ]) )
+        # Test U+E007F cancel tag
+        self.assertEqual(demjson.encode(u'\U000E007F', escape_unicode=False, encoding='utf-8'),
+                         rawbytes([ ord(c) for c in '"\\udb40\\udc7f"' ]) )
 
     def testDecodeSupplementalUnicode(self):
         import sys
         if sys.maxunicode > 65535:
-            self.assertEqual(demjson.decode(r'"\udbc8\udf45"'), u'\U00102345')
-            self.assertEqual(demjson.decode(r'"\ud800\udc00"'), u'\U00010000')
-            self.assertEqual(demjson.decode(r'"\udbff\udfff"'), u'\U0010ffff')
+            self.assertEqual(demjson.decode( rawbytes([ ord(c) for c in r'"\udbc8\udf45"' ]) ),
+                             u'\U00102345')
+            self.assertEqual(demjson.decode( rawbytes([ ord(c) for c in r'"\ud800\udc00"' ]) ),
+                             u'\U00010000')
+            self.assertEqual(demjson.decode( rawbytes([ ord(c) for c in r'"\udbff\udfff"' ]) ),
+                             u'\U0010ffff')
         for bad_case in [r'"\ud801"', r'"\udc02"',
                          r'"\ud801\udbff"', r'"\ud801\ue000"',
                          r'"\ud801\u2345"']:
             try:
-                self.assertRaises(demjson.JSONDecodeError, demjson.decode(bad_case))
+                self.assertRaises(demjson.JSONDecodeError,
+                                  demjson.decode( rawbytes([ ord(c) for c in bad_case ]) ) )
             except demjson.JSONDecodeError:
                 pass
 
     def testEncodeSupplementalUnicode(self):
         import sys
         if sys.maxunicode > 65535:
-            self.assertEqual(demjson.encode(u'\U00010000',encoding='ascii'), r'"\ud800\udc00"')
-            self.assertEqual(demjson.encode(u'\U00102345',encoding='ascii'), r'"\udbc8\udf45"')
-            self.assertEqual(demjson.encode(u'\U0010ffff',encoding='ascii'), r'"\udbff\udfff"')
+            self.assertEqual(demjson.encode(u'\U00010000',encoding='ascii'),
+                             rawbytes([ ord(c) for c in r'"\ud800\udc00"' ]) )
+            self.assertEqual(demjson.encode(u'\U00102345',encoding='ascii'),
+                             rawbytes([ ord(c) for c in r'"\udbc8\udf45"' ]) )
+            self.assertEqual(demjson.encode(u'\U0010ffff',encoding='ascii'),
+                             rawbytes([ ord(c) for c in r'"\udbff\udfff"' ]) )
 
     def testDecodeArraySimple(self):
         self.assertEqual(demjson.decode('[]'), [])
@@ -317,9 +355,13 @@ class DemjsonTest(unittest.TestCase):
         """Makes sure it can encode things which look like dictionarys but aren't.
 
         """
-        import UserDict
-        import string
-        class LikeDict(UserDict.DictMixin):
+        try:
+            import UserDict
+            mixin = UserDict.DictMixin
+        except ImportError:
+            # Python3?  No UserDict
+            mixin = object
+        class LikeDict(mixin):
             def __getitem__(self,key):
                 import string
                 if key in string.ascii_uppercase:
@@ -357,7 +399,8 @@ class DemjsonTest(unittest.TestCase):
         mystring = LikeString('hello')
         self.assertEqual(demjson.encode(mystring), '"hello"')
         mystring = LikeString(u'hi\u2012there')
-        self.assertEqual(demjson.encode(mystring, escape_unicode=True, encoding='utf-8'), r'"hi\u2012there"')
+        self.assertEqual(demjson.encode(mystring, escape_unicode=True, encoding='utf-8'),
+                         rawbytes([ ord(c) for c in r'"hi\u2012there"' ]) )
 
     def testObjectNonstringKeys(self):
         self.assertEqual(demjson.decode('{55:55}',strict=False), {55:55})

@@ -6,12 +6,34 @@ Version 1.7 released 2014-04-13
    the constraint that a JSON document must start with an object or
    array.  Now any JSON value type is a legal JSON document.
 
- * When outputting JSON any Unicode line terminator characters will
-   always be \u-escaped.  This is to increase compatibility with
-   JavaScript which forbids them in string literals.  It includes the
-   characters:
-       - U+2028  LINE SEPARATOR  (Category Zl)
+ * Python 3. This version supports Python 3, via the 2to3 conversion
+   program.  Note that the API will in some cases deal with byte
+   array types rather than strings.  Be sure to read more in the
+   file "docs/PYTHON3.txt".
+
+ * Unicode: When outputting JSON certain additional characters in
+   strings will now always be \u-escaped to increase compatibility
+   with JavaScript.  This includes line terminators (which are
+   forbidden in JavaScript string literals) as well as format control
+   characters (which any JavaScript implementation is allowed to
+   ignore if it chooses).
+
+   This essentially includes any character in the Unicode Categories
+   of Cc, Cf, Zl, and Zp -- which for example includes:
+
+       - U+007F  DELETE               (Category Cc)
+       - U+00AD  SOFT HYPHEN          (Category Cf)
+       - U+200F  RIGHT-TO-LEFT MARK   (Category Cf)
+       - U+2028  LINE SEPARATOR       (Category Zl)
        - U+2029  PARAGRAPH SEPARATOR  (Category Zp)
+       - U+E007F CANCEL TAG           (Category Cf)
+
+ * Mutable strings: Support for encoding the old Python
+   "UserString.MutableString" type has been dropped.  That
+   experimental type had already been deprecated since Python 2.6 and
+   removed entirely from Python 3.  If you have code that uses the
+   MutableString type either do not upgrade to this release, or first
+   convert such types to standard strings before JSON encoding them.
 
  * The "jsonlint" command script will now be installed by default.
 

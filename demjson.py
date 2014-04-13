@@ -491,8 +491,18 @@ del _nonnumber_float_constants
 # ----------------------------------------------------------------------
 # String processing helpers
 
-unsafe_string_chars = '"\\' + ''.join([chr(_i) for _i in range(0x20)])
-del _i
+def _make_unsafe_string_chars():
+    import unicodedata
+    unsafe = []
+    for c in [unichr(i) for i in range(0x100)]:
+        if c == u'"' or c == u'\\' \
+                or unicodedata.category( c ) in ['Cc','Cf','Zl','Zp']:
+            unsafe.append( c )
+    return u''.join( unsafe )
+unsafe_string_chars = _make_unsafe_string_chars()
+del _make_unsafe_string_chars
+
+
 def skipstringsafe( s, start=0, end=None ):
     i = start
     #if end is None:
@@ -538,16 +548,30 @@ def extend_and_flatten_list_with_sep( orig_seq, extension_seq, separator='' ):
 # Python did not provide a UTF-32 codec.  So we must implement UTF-32
 # ourselves in case we need it.
 
-def utf32le_encode( obj, errors='strict' ):
-    """Encodes a Unicode string into a UTF-32LE encoded byte string."""
-    import struct
-    try:
-        import cStringIO as sio
-    except ImportError:
-        import StringIO as sio
-    f = sio.StringIO()
-    write = f.write
+def utf32_encode( obj, errors='strict', endian='LE' ):
+    """Encodes a Unicode string into a UTF-32 encoded byte string."""
+    import sys, struct
     pack = struct.pack
+    if endian.upper() in ['LE','LITTLE']:
+        packlong = '<L'
+    elif endian.upper() in ['BE','BIG']:
+        packlong = '>L'
+    else:
+        raise ValueError("Expected endian to be one of \"LE\" or \"BE\".", endian)
+
+    if sys.version_info.major >= 3:
+        # Python 3
+        f = bytearray()
+        write = f.extend
+    else:
+        # Python 2
+        try:
+            import cStringIO as sio
+        except ImportError:
+            import StringIO as sio
+        f = sio.StringIO()
+        write = f.write
+
     for c in obj:
         n = ord(c)
         if 0xD800 <= n <= 0xDFFF: # surrogate codepoints are prohibited by UTF-32
@@ -558,62 +582,45 @@ def utf32le_encode( obj, errors='strict' ):
             else:
                 cname = 'U+%04X'%n
                 raise UnicodeError('UTF-32 can not encode surrogate characters',cname)
-        write( pack('<L', n) )
-    return f.getvalue()
+        write( pack(packlong, n) )
+    if sys.version_info.major >= 3:
+        return bytes(f)
+    else:
+        return f.getvalue()
 
+def utf32le_encode( obj, errors='strict' ):
+    return utf32_encode( obj, errors=errors, endian='LE' )
 
 def utf32be_encode( obj, errors='strict' ):
-    """Encodes a Unicode string into a UTF-32BE encoded byte string."""
-    import struct
-    try:
-        import cStringIO as sio
-    except ImportError:
-        import StringIO as sio
-    f = sio.StringIO()
-    write = f.write
-    pack = struct.pack
-    for c in obj:
-        n = ord(c)
-        if 0xD800 <= n <= 0xDFFF: # surrogate codepoints are prohibited by UTF-32
-            if errors == 'ignore':
-                continue
-            elif errors == 'replace':
-                n = ord('?')
-            else:
-                cname = 'U+%04X'%n
-                raise UnicodeError('UTF-32 can not encode surrogate characters',cname)
-        write( pack('>L', n) )
-    return f.getvalue()
+    return utf32_encode( obj, errors=errors, endian='BE' )
 
+
+def utf32_decode( obj, errors='strict', endian='LE' ):
+    """Decodes a UTF-32LE byte string into a Unicode string."""
+    if endian.upper() in ['LE','LITTLE']:
+        packlong = '<L'
+    elif endian.upper() in ['BE','BIG']:
+        packlong = '>L'
+    else:
+        raise ValueError("Expected endian to be one of \"LE\" or \"BE\".", endian)
+
+    if len(obj) % 4 != 0:
+        raise UnicodeError('UTF-32 decode error, data length not a multiple of 4 bytes')
+    import struct
+    unpack = struct.unpack
+    chars = []
+    i = 0
+    for i in range(0, len(obj), 4):
+        seq = obj[i:i+4]
+        n = unpack(packlong,seq)[0]
+        chars.append( unichr(n) )
+    return u''.join( chars )
 
 def utf32le_decode( obj, errors='strict' ):
-    """Decodes a UTF-32LE byte string into a Unicode string."""
-    if len(obj) % 4 != 0:
-        raise UnicodeError('UTF-32 decode error, data length not a multiple of 4 bytes')
-    import struct
-    unpack = struct.unpack
-    chars = []
-    i = 0
-    for i in range(0, len(obj), 4):
-        seq = obj[i:i+4]
-        n = unpack('<L',seq)[0]
-        chars.append( unichr(n) )
-    return u''.join( chars )
-
+    return utf32_decode( obj, errors=errors, endian='LE' )
 
 def utf32be_decode( obj, errors='strict' ):
-    """Decodes a UTF-32BE byte string into a Unicode string."""
-    if len(obj) % 4 != 0:
-        raise UnicodeError('UTF-32 decode error, data length not a multiple of 4 bytes')
-    import struct
-    unpack = struct.unpack
-    chars = []
-    i = 0
-    for i in range(0, len(obj), 4):
-        seq = obj[i:i+4]
-        n = unpack('>L',seq)[0]
-        chars.append( unichr(n) )
-    return u''.join( chars )
+    return utf32_decode( obj, errors=errors, endian='BE' )
 
 
 def auto_unicode_decode( s ):
@@ -631,10 +638,16 @@ def auto_unicode_decode( s ):
     if len(s) < 4:
         return s.decode('utf8')  # not enough bytes, assume default of utf-8
     # Look for BOM marker
-    import codecs
+    import sys, codecs
     bom2 = s[:2]
     bom4 = s[:4]
-    a, b, c, d = map(ord, s[:4])  # values of first four bytes
+
+    # Assign values of first four bytes to: a, b, c, d
+    a, b, c, d = s[0], s[1], s[2], s[3]
+    if isinstance(a, basestring):
+        # This is to make both Python 2 and Python 3 happy
+        a, b, c, d = ord(a), ord(b), ord(c), ord(d)
+
     if bom4 == codecs.BOM_UTF32_LE:
         encoding = 'utf-32le'
         s = s[4:]
@@ -739,8 +752,7 @@ def isstringtype( obj ):
     # Must also check for some other pseudo-string types
     import types, UserString
     return isinstance(obj, types.StringTypes) \
-           or isinstance(obj, UserString.UserString) \
-           or isinstance(obj, UserString.MutableString)
+           or isinstance(obj, UserString.UserString)
 
 
 # ----------------------------------------------------------------------
@@ -891,7 +903,7 @@ class JSON(object):
         the encode_default() method.
         
         """
-        import sys
+        import sys, unicodedata
         self._set_strictness(strict)
         self._encode_compactly = compactly
         try:
@@ -909,8 +921,11 @@ class JSON(object):
         # which will quickly tell us which of those characters never
         # need to be escaped.
 
-        self._asciiencodable = [32 <= c < 128 and not self._rev_escapes.has_key(chr(c))
-                                for c in range(0,256)]
+        self._asciiencodable = \
+            [32 <= c < 128 \
+                 and not self._rev_escapes.has_key(chr(c)) \
+                 and not unicodedata.category(unichr(c)) in ['Cc','Cf','Zl','Zp']
+             for c in range(0,256)]
 
     def _set_strictness(self, strict):
         """Changes the strictness behavior.
@@ -1029,10 +1044,20 @@ class JSON(object):
 
         Ref. ECMAScript section 7.1.
 
+        There are dozens of Format Control Characters, for example:
+            U+00AD   SOFT HYPHEN
+            U+200B   ZERO WIDTH SPACE
+            U+2060   WORD JOINER
+
         """
         import unicodedata
-        txt2 = filter( lambda c: unicodedata.category(unicode(c)) != 'Cf',
-                       txt )
+        txt2 = filter( lambda c: unicodedata.category(unicode(c)) != 'Cf', txt )
+
+        # 2to3 NOTE: The following is needed to work around a broken
+        # Python3 conversion in which filter() will be transformed
+        # into a list rather than a string.
+        if not isinstance(txt2,basestring):
+            txt2 = u''.join(txt2)
         return txt2
 
 
@@ -1386,8 +1411,9 @@ class JSON(object):
         """
         # Must handle instances of UserString specially in order to be
         # able to use ord() on it's simulated "characters".
+        import unicodedata
         import UserString
-        if isinstance(s, (UserString.UserString, UserString.MutableString)):
+        if isinstance(s, UserString.UserString):
             def tochar(c):
                 return c.data
         else:
@@ -1429,8 +1455,8 @@ class JSON(object):
                 # Has a shortcut escape sequence, like "\n"
                 chunks.append(revesc[c])
                 i += 1
-            elif cord <= 0x1F or self.islineterm(c):
-                # Always unicode escape ASCII-control characters or line terminators
+            elif cord <= 0x1F:
+                # Always unicode escape ASCII-control characters
                 chunks.append(r'\u%04x' % cord)
                 i += 1
             elif 0xD800 <= cord <= 0xDFFF:
@@ -1439,29 +1465,36 @@ class JSON(object):
                 # So all we can do is complain.
                 cname = 'U+%04X' % cord
                 raise JSONEncodeError('can not include or escape a Unicode surrogate character',cname)
-            elif cord <= 0xFFFF:
-                # Other BMP Unicode character
-                if isinstance(encunicode, bool):
-                    doesc = encunicode
-                else:
-                    doesc = encunicode( c )
-                if doesc:
-                    chunks.append(r'\u%04x' % cord)
-                else:
-                    chunks.append( c )
-                i += 1
-            else: # ord(c) >= 0x10000
-                # Non-BMP Unicode
-                if isinstance(encunicode, bool):
-                    doesc = encunicode
-                else:
-                    doesc = encunicode( c )
-                if doesc:
-                    for surrogate in unicode_as_surrogate_pair(c):
-                        chunks.append(r'\u%04x' % ord(surrogate))
-                else:
-                    chunks.append( c )
-                i += 1
+            else:
+                # Some other Unicode character
+                ccat = unicodedata.category(c)
+                if cord <= 0xFFFF:
+                    # Other BMP Unicode character
+                    if ccat in ['Cc','Cf','Zl','Zp']:
+                        doesc = True
+                    elif isinstance(encunicode, bool):
+                        doesc = encunicode
+                    else:
+                        doesc = encunicode( c )
+                    if doesc:
+                        chunks.append(r'\u%04x' % cord)
+                    else:
+                        chunks.append( c )
+                    i += 1
+                else: # ord(c) >= 0x10000
+                    # Non-BMP Unicode
+                    if ccat in ['Cc','Cf','Zl','Zp']:
+                        doesc = True
+                    elif isinstance(encunicode, bool):
+                        doesc = encunicode
+                    else:
+                        doesc = encunicode( c )
+                    if doesc:
+                        for surrogate in unicode_as_surrogate_pair(c):
+                            chunks.append(r'\u%04x' % ord(surrogate))
+                    else:
+                        chunks.append( c )
+                    i += 1
         chunks.append('"')
         return ''.join( chunks )
 

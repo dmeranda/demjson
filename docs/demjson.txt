@@ -351,6 +351,11 @@ CLASSES
      |      tokenization occurs.  Note that JSON does not allow them.
      |      
      |      Ref. ECMAScript section 7.1.
+     |      
+     |      There are dozens of Format Control Characters, for example:
+     |          U+00AD   SOFT HYPHEN
+     |          U+200B   ZERO WIDTH SPACE
+     |          U+2060   WORD JOINER
      |  
      |  ----------------------------------------------------------------------
      |  Data descriptors defined here:
@@ -706,17 +711,19 @@ FUNCTIONS
         If the input character is inside the BMP then the output tuple will have
         just a single character...the same one.
     
-    utf32be_decode(obj, errors='strict')
-        Decodes a UTF-32BE byte string into a Unicode string.
-    
-    utf32be_encode(obj, errors='strict')
-        Encodes a Unicode string into a UTF-32BE encoded byte string.
-    
-    utf32le_decode(obj, errors='strict')
+    utf32_decode(obj, errors='strict', endian='LE')
         Decodes a UTF-32LE byte string into a Unicode string.
     
+    utf32_encode(obj, errors='strict', endian='LE')
+        Encodes a Unicode string into a UTF-32 encoded byte string.
+    
+    utf32be_decode(obj, errors='strict')
+    
+    utf32be_encode(obj, errors='strict')
+    
+    utf32le_decode(obj, errors='strict')
+    
     utf32le_encode(obj, errors='strict')
-        Encodes a Unicode string into a UTF-32LE encoded byte string.
 
 DATA
     __author__ = 'Deron Meranda <http://deron.meranda.us/>'
@@ -734,7 +741,7 @@ DATA
     neginf = -inf
     octaldigits = '01234567'
     undefined = demjson.undefined
-    unsafe_string_chars = '"\\\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b...
+    unsafe_string_chars = u'\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\x...
 
 VERSION
     1.7

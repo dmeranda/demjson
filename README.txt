@@ -19,8 +19,9 @@ your JSON documents for strict conformance to the RFC specification;
 as it can also reformat them, either by re-indenting or removing
 unnecessary whitespace for minimal/canonical JSON output.
 
-Why demjson?
-============
+
+Why use demjson rather than the Python standard library?
+========================================================
 
 demjson was written before Python had any built-in JSON support in its
 standard library.  At the time there were just a handful of
@@ -30,19 +31,33 @@ the RFC.  Also what I considered to be the best of the group
 
 So I wrote demjson to be:
 
- * Pure Python, requiring no compiled extension
- * RFC compliant. It should follow the JSON specification exactly.
+ * Pure Python, requiring no compiled extension.
+ * 100% RFC compliant. It should follow the JSON specification exactly.
 
-It should be noted that Python has since gotten JSON into its standard
+It should be noted that Python has since added JSON into its standard
 library (which was actually an "absorption" of simplejson, the C
 extension module I previously mentioned, but after it had been fixed
 to repair its RFC issues).
 
 For MOST uses, the standard Python JSON library should be sufficient.
 
-However demjson may still be useful. In particular it in general has
-better error handling and "lint" checking capabilities.  It also can
-correctly deal with different Unicode encodings, including ASCII.
+However demjson may still be useful:
+
+ * It works in old Python versions that don't have JSON built in;
+
+ * It generally has better error handling and "lint" checking capabilities;
+
+ * It can correctly deal with different Unicode encodings, including ASCII.
+
+ * It generates more conservative JSON, such as escaping Unicode
+   format control characters or line terminators, which should improve
+   data portability.
+
+ * In non-strict mode it can also deal with slightly non-conforming
+   input that is more JavaScript than JSON (such as allowing comments).
+
+ * It supports a broader set of types during conversion, including
+   Python's Decimal or UserString.
 
 
 Compatibility

@@ -1,7 +1,19 @@
 # -*- python -*-
-from distutils.core import setup
+import sys
+try:
+    from setuptools import setup
+except ImportError:
+    from distutils.core import setup
+
 name = 'demjson'
 version = '1.7'
+
+extra = {}
+if sys.version_info.major >= 3:
+    extra['use_2to3'] = True
+    #extra['convert_2to3_doctests'] = ['src/your/module/README.txt']
+    #extra['use_2to3_fixers'] = ['your.fixers']
+
 setup( name=name,
        version=version,
        py_modules=[name],
@@ -33,9 +45,11 @@ for strict compliance to the standard.
                     "Intended Audience :: Developers",
                     "License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)",
                     "Operating System :: OS Independent",
-                    "Programming Language :: Python :: 2 :: Only",
+                    "Programming Language :: Python :: 2",
+                    "Programming Language :: Python :: 3",
                     "Topic :: Software Development :: Libraries :: Python Modules",
                     "Topic :: Internet :: WWW/HTTP :: Dynamic Content"
-                    ]
+                    ],
+       **extra
        )
 
