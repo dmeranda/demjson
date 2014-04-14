@@ -1,18 +1,28 @@
-# -*- python -*-
-import sys
-try:
-    from setuptools import setup
-except ImportError:
-    from distutils.core import setup
+# Python package setup script        -*- coding: utf-8 -*-
 
 name = 'demjson'
 version = '1.7'
 
-extra = {}
+import sys
 if sys.version_info.major >= 3:
-    extra['use_2to3'] = True
-    #extra['convert_2to3_doctests'] = ['src/your/module/README.txt']
-    #extra['use_2to3_fixers'] = ['your.fixers']
+    # Python 3, use setuptools first
+    try:
+        from setuptools import setup
+    except ImportError:
+        from distutils.core import setup
+else:
+    # Python 2, use distutils first
+    try:
+        from distutils.core import setup
+    except ImportError:
+        from setuptools import setup
+
+py3extra = {}
+
+if sys.version_info.major >= 3:
+    py3extra['use_2to3'] = True
+    #py3extra['convert_2to3_doctests'] = ['src/your/module/README.txt']
+    #py3extra['use_2to3_fixers'] = ['your.fixers']
 
 setup( name=name,
        version=version,
@@ -50,6 +60,6 @@ for strict compliance to the standard.
                     "Topic :: Software Development :: Libraries :: Python Modules",
                     "Topic :: Internet :: WWW/HTTP :: Dynamic Content"
                     ],
-       **extra
+       **py3extra
        )
 
