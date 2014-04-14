@@ -47,7 +47,12 @@ However demjson may still be useful:
 
  * It generally has better error handling and "lint" checking capabilities;
 
+ * It will automatically use the Python Decimal (bigfloat) class
+   instead of a floating-point number whenever there might be an
+   overflow or loss of precision otherwise.
+
  * It can correctly deal with different Unicode encodings, including ASCII.
+   It will automatically adapt when to use \u-escapes based on the encoding.
 
  * It generates more conservative JSON, such as escaping Unicode
    format control characters or line terminators, which should improve

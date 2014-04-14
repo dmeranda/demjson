@@ -1233,7 +1233,7 @@ class JSON(object):
                     if decimal and (abs(exponent) > float_maxexp or sigdigits > float_sigdigits):
                         try:
                             n = decimal.Decimal(number)
-                            n = n.normalize()
+                            #n = n.normalize()
                         except decimal.Overflow:
                             if sign<0:
                                 n = neginf
@@ -2173,5 +2173,312 @@ def decode( txt, strict=False, encoding=None, **kw ):
     # Now ready to do the actual decoding
     obj = j.decode( unitxt )
     return obj
+
+
+# ======================================================================
+
+class jsonlint(object):
+    """This class contains most of the logic for the "jsonlint" command.
+
+    You generally create an instance of this class, to defined the
+    program's environment, and then call the main() method.  A simple
+    wrapper to turn this into a script might be:
+
+        import sys, demjson
+        if __name__ == '__main__':
+            lint = demjson.jsonlint( sys.argv[0] )
+            return lint.main( sys.argv[1:] )
+
+    """
+    _jsonlint_usage = """Usage: %(program_name)s [<options> ...] inputfile.json ...
+
+With no input filename, or "-", it will read from standard input.
+
+The return status will be 0 if the file is conforming JSON (per the
+RFC 7158 specification), or non-zero otherwise.
+
+OPTIONS:
+
+ -v | --verbose    Show details of lint checking
+ -q | --quiet      Don't show any warnings
+
+ -s | --strict     Be strict in what is considered conforming JSON (the default)
+ -S | --nonstrict  Be loose in what is considered conforming JSON
+
+ -f | --format     Reformat the JSON text (if conforming) to stdout
+ -F | --format-compactly
+        Reformat the JSON simlar to -f, but do so compactly by
+        removing all unnecessary whitespace
+ -o filename | --output filename
+        The filename to which reformatted JSON is to be written.
+        Without this option the standard output is used.
+
+UNICODE OPTIONS:
+
+ -e codec | --encoding=codec     Set both input and output encodings
+ --input-encoding=codec          Set the input encoding
+ --output-encoding=codec         Set the output encoding
+
+    These options set the character encoding codec (e.g., "ascii",
+    "utf-8", "utf-16").  The -e will set both the input and output
+    encodings to the same thing.  The output encoding is used when
+    reformatting with the -f or -F options.
+
+    Unless set, the input encoding is guessed and the output
+    encoding will be "utf-8".
+
+REFORMATTING / PRETTY-PRINTING:
+
+    When reformatting JSON with -f or -F, output is only produced if
+    the input passed validation.  By default the reformatted JSON will
+    be written to standard output, unless the -o option was given.
+
+    The default output codec is UTF-8, unless an encoding option is
+    provided.  Any Unicode characters will be output as literal
+    characters if the encoding permits, otherwise they will be
+    \u-escaped.  You can use "--output-encoding ascii" to force all
+    Unicode characters to be escaped.
+
+MORE INFORMATION:
+
+    Use '%(program_name)s --version [-v]' to see versioning information.
+    Use '%(program_name)s --copyright' to see author and copyright details.'
+
+    %(program_name)s is distributed as part of the "demjson" Python module.
+    See %(homepage)s
+"""
+
+    def __init__(self, program_name='jsonlint', stdin=None, stdout=None, stderr=None ):
+        """Create an instance of a "jsonlint" program.
+
+        You can optionally pass options to define the program's environment:
+
+          * program_name  - the name of the program, usually sys.argv[0]
+          * stdin   - the file object to use for input, default sys.stdin
+          * stdout  - the file object to use for outut, default sys.stdout
+          * stderr  - the file object to use for error output, default sys.stderr
+
+        After creating an instance, you typically call the main() method.
+
+        """
+        import os, sys
+        self.program_path = program_name
+        self.program_name = os.path.basename(program_name)
+        if stdin:
+            self.stdin = stdin
+        else:
+            self.stdin = sys.stdin
+
+        if stdout:
+            self.stdout = stdout
+        else:
+            self.stdout = sys.stdout
+
+        if stderr:
+            self.stderr = stderr
+        else:
+            self.stderr = sys.stderr
+
+    @property
+    def usage(self):
+        """A mutlti-line string containing the program usage instructions.
+        """
+        return self._jsonlint_usage % {'program_name':self.program_name, 'homepage':__homepage__}
+
+    def _lintcheck_data( self,
+                        jsondata,
+                        verbose_fp=None, strict=True,
+                        reformat=False,
+                        input_encoding=None, output_encoding=None, escape_unicode=True,
+                        pfx='' ):
+        global decode, encode
+        success = False
+        reformatted = None
+        try:
+            data = decode(jsondata, strict=strict, encoding=input_encoding)
+        except JSONError, err:
+            success = False
+            if verbose_fp:
+                verbose_fp.write('%s%s\n' % (pfx, err.pretty_description()) )
+        except UnicodeDecodeError, err:
+            success = False
+            if verbose_fp:
+                verbose_fp.write('%sFile is not text: %s\n' % (pfx, str(err) ))
+        else:
+            success = True
+            if reformat == 'compactly':
+                reformatted = encode(data, compactly=True, encoding=output_encoding, escape_unicode=escape_unicode)
+            elif reformat:
+                reformatted = encode(data, compactly=False, encoding=output_encoding, escape_unicode=escape_unicode)
+        return (success, reformatted)
+    
+    
+    def _lintcheck( self, filename, output_filename,
+                   verbose=False, strict=True, reformat=False,
+                   input_encoding=None, output_encoding=None, escape_unicode=True ):
+        import sys
+        verbose_fp = None
+    
+        if not filename or filename == "-":
+            pfx = '<stdin>: '
+            jsondata = self.stdin.read()
+            if verbose:
+                verbose_fp = self.stderr
+        else:
+            pfx = '%s: ' % filename
+            try:
+                fp = open( filename, 'rb' )
+                jsondata = fp.read()
+                fp.close()
+            except IOError, err:
+                self.stderr.write('%s: %s\n' % (pfx, str(err)) )
+                return False
+            if verbose:
+                verbose_fp = self.stdout
+    
+        success, reformatted = self._lintcheck_data(
+            jsondata,
+            verbose_fp=verbose_fp,
+            strict=strict,
+            reformat=reformat,
+            input_encoding=input_encoding, output_encoding=output_encoding,
+            escape_unicode=escape_unicode,
+            pfx=pfx )
+        if success and reformat:
+            if output_filename:
+                try:
+                    fp = open( output_filename, 'wb' )
+                    fp.write( reformatted )
+                except IOError, err:
+                    self.stderr.write('%s: %s\n' % (pfx, str(err)) )
+                    success = False
+            else:
+                self.stdout.write( reformatted )
+        elif success and verbose_fp:
+            verbose_fp.write('%sok\n' % pfx)
+    
+        return success
+
+
+    def main( self, argv ):
+        """The main routine for program "jsonlint".
+
+        Should be called with sys.argv[1:] as its sole argument.
+
+        Note sys.argv[0] which normally contains the program name
+        should not be passed to main(); instead this class itself
+        is initialized with sys.argv[0].
+
+        Use "--help" for usage syntax, or consult the 'usage' member.
+
+        """
+        import sys, os, getopt, unicodedata
+
+        success = True
+        verbose = 'auto'  # one of 'auto', True, or False
+        strict = True
+        reformat = False
+        output_filename = None
+        input_encoding = None
+        output_encoding = 'utf-8'
+        escape_unicode = False
+    
+        try:
+            opts, args = getopt.getopt( argv,
+                                        'vqfFe:o:sS',
+                                        ['verbose','quiet',
+                                         'format','format-compactly',
+                                         'output',
+                                         'strict','nonstrict',
+                                         'encoding=',
+                                         'input-encoding=','output-encoding=',
+                                         'help','version','copyright'] )
+        except getopt.GetoptError, err:
+            self.stderr.write( "Error: %s.  Use \"%s --help\" for usage information.\n" \
+                                  % (err.msg, self.program_name) )
+            return 1
+    
+        # Set verbose before looking at any other options
+        for opt, val in opts:
+            if opt in ('-v', '--verbose'):
+                verbose=True
+    
+        # Process all options
+        for opt, val in opts:
+            if opt in ('-h', '--help'):
+                self.stdout.write( self._jsonlint_usage \
+                                      % {'program_name':self.program_name, 'homepage':__homepage__} )
+                return 0
+            elif opt == '--version':
+                self.stdout.write( '%s (%s) version %s (%s)\n' \
+                                      % (self.program_name, __name__, __version__, __date__) )
+                if verbose == True:
+                    self.stdout.write( 'demjson from %r\n' % (__file__,) )
+                if verbose == True:
+                    self.stdout.write( 'Python version: %s\n' % (sys.version.replace('\n',' '),) )
+                    self.stdout.write( 'This python implementation supports:\n' )
+                    self.stdout.write( '  * Max unicode: U+%X\n' % (sys.maxunicode,) )
+                    self.stdout.write( '  * Unicode version: %s\n' % (unicodedata.unidata_version,) )
+                    self.stdout.write( '  * Floating-point significant digits: %d\n' % (float_sigdigits,) )
+                    self.stdout.write( '  * Floating-point max 10^exponent: %d\n' % (float_maxexp,) )
+                    if str(0.0)==str(-0.0):
+                        szero = 'No'
+                    else:
+                        szero = 'Yes'
+                    self.stdout.write( '  * Floating-point has signed-zeros: %s\n' % (szero,) )
+                    if decimal:
+                        has_dec = 'Yes'
+                    else:
+                        has_dec = 'No'
+                    self.stdout.write( '  * Decimal (bigfloat) support: %s\n' % (has_dec,) )
+                return 0
+            elif opt == '--copyright':
+                self.stdout.write( "%s is distributed as part of the \"demjson\" python package.\n" \
+                                      % (self.program_name,) )
+                self.stdout.write( "See %s\n\n\n" % (__homepage__,) )
+                self.stdout.write( __credits__ )
+                return 0
+            elif opt in ('-v', '--verbose'):
+                verbose = True
+            elif opt in ('-q', '--quiet'):
+                verbose = False
+            elif opt in ('-s', '--strict'):
+                strict = True
+            elif opt in ('-S', '--nonstrict'):
+                strict = False
+            elif opt in ('-f', '--format'):
+                reformat = True
+            elif opt in ('-F', '--format-compactly'):
+                reformat = 'compactly'
+            elif opt in ('-o', '--output'):
+                output_filename = val
+            elif opt in ('-e','--encoding'):
+                input_encoding = val
+                output_encoding = val
+                escape_unicode = False
+            elif opt in ('--output-encoding'):
+                output_encoding = val
+                escape_unicode = False
+            elif opt in ('--input-encoding'):
+                input_encoding = val
+            else:
+                self.stderr.write('Unknown option %r\n' % opt)
+                return 1
+                
+        if not args:
+            args = [None]
+    
+        for fn in args:
+            if not self._lintcheck( fn, output_filename=output_filename,
+                                   verbose=verbose, reformat=reformat,
+                                   strict=strict,
+                                   input_encoding=input_encoding,
+                                   output_encoding=output_encoding,
+                                   escape_unicode=escape_unicode ):
+                success = False
+    
+        if not success:
+            return 1
+        return 0
 
 # end file

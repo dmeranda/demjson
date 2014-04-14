@@ -24,24 +24,32 @@ What's new
 These are the changes from 1.6 to 1.7 (released 2014-04-13).  See the
 file "docs/CHANGES.txt" for a complete history of changes.
 
- * RFC 7159 support. The new RFC, wich superseded RFC 4627, relaxes
-   the constraint that a JSON document must start with an object or
-   array.  Now any JSON value type is a legal JSON document.
+ * RFC 7159 support. The new RFC (published March 2104 and which
+   superseded RFC 4627) relaxes the constraint that a JSON document
+   must start with an object or array.  Now any JSON value type is a
+   legal JSON document.
 
- * Python 3. This version supports Python 3, via the 2to3 conversion
-   program.  Note that the API will in some cases deal with byte
-   array types rather than strings.  Be sure to read more in the
-   file "docs/PYTHON3.txt".
+ * Python 3. This version supports both Python 2 and Python 3, via the
+   2to3 conversion program.  When installing via setup.py or a PyPI
+   distribution mechanism, this conversion should automatically
+   happern.
+
+   Note that the API under Python 3 will be slightly different.
+   Mainly there will be some cases in which byte array types are used
+   or returned rather than strings.
+
+   Read the file "docs/PYTHON3.txt" for complete information.
 
  * Unicode: When outputting JSON certain additional characters in
    strings will now always be \u-escaped to increase compatibility
    with JavaScript.  This includes line terminators (which are
    forbidden in JavaScript string literals) as well as format control
    characters (which any JavaScript implementation is allowed to
-   ignore if it chooses).
+   ignore if it chooses per the ECMAscript standard).
 
-   This essentially includes any character in the Unicode Categories
-   of Cc, Cf, Zl, and Zp -- which for example includes:
+   This essentially means that characters in any of the Unicode
+   categories of Cc, Cf, Zl, and Zp will be \u-escaped; which includes
+   for example:
 
        - U+007F  DELETE               (Category Cc)
        - U+00AD  SOFT HYPHEN          (Category Cf)
@@ -50,19 +58,27 @@ file "docs/CHANGES.txt" for a complete history of changes.
        - U+2029  PARAGRAPH SEPARATOR  (Category Zp)
        - U+E007F CANCEL TAG           (Category Cf)
 
- * Mutable strings: Support for encoding the old Python
+ * Mutable strings: Support for the old Python type
    "UserString.MutableString" type has been dropped.  That
    experimental type had already been deprecated since Python 2.6 and
-   removed entirely from Python 3.  If you have code that uses the
-   MutableString type either do not upgrade to this release, or first
-   convert such types to standard strings before JSON encoding them.
+   removed entirely from Python 3.  If you have code that passes a
+   MutableString to a JSON encoding function then either do not
+   upgrade to this release, or first convert such types to standard
+   strings before JSON encoding them.
 
  * The "jsonlint" command script will now be installed by default.
 
- * jsonlint improvements:
-       - Fixed reading from stdin
+ * jsonlint class: Almost all the logic of the jsonlint script is now
+   available as a new class, demjson.jsonlint, should you want to call
+   it programatically.
+
+   The included "jsonlint" script file is now just a very small
+   wrapper around that class.
+
+ * Other jsonlint improvements:
+       - Fixed bugs in reading from stdin
        - New -o option to specify output filename
-       - Verbosity on by default, new --quiet option
+       - Verbosity is on by default, new --quiet option
        - Better help text
 
 
@@ -93,7 +109,12 @@ However demjson may still be useful for some purposes:
 
  * It generally has better error handling and "lint" checking capabilities;
 
+ * It will automatically use the Python Decimal (bigfloat) class
+   instead of a floating-point number whenever there might be an
+   overflow or loss of precision otherwise.
+
  * It can correctly deal with different Unicode encodings, including ASCII.
+   It will automatically adapt when to use \u-escapes based on the encoding.
 
  * It generates more conservative JSON, such as escaping Unicode
    format control characters or line terminators, which should improve

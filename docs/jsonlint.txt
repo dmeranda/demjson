@@ -35,7 +35,7 @@ UNICODE OPTIONS:
     Unless set, the input encoding is guessed and the output
     encoding will be "utf-8".
 
-REFORMATTING:
+REFORMATTING / PRETTY-PRINTING:
 
     When reformatting JSON with -f or -F, output is only produced if
     the input passed validation.  By default the reformatted JSON will
