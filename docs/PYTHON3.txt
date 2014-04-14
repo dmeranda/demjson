@@ -1,2 +1,94 @@
-Information about using demjson with Python 3
+Using demjson with Python 3
+===========================
 
+Starting with release 1.7, demjson, and jsonlint, can support either
+Python 2 or Python 3 -- though it must be installed as described below
+to work with Python 3.
+
+Be aware though that the API will have slightly different behavior in
+Python 3.
+
+
+Installing for Python 3
+=======================
+
+Starting with 1.7, the demjson module is distributed with code that is
+written for Python 2.x.  However it has been designed to be converted
+to a Python 3 equivalent form by using the standard "2to3" Python
+utility.
+
+If you have installed demjson with a standard PyPI package
+distribution mechanism; such as pipi, easy_install, or just typing
+"python3 setup.py install"; then the 2to3 conversion will be performed
+automatically as part of the installation process.
+
+
+API Differences
+===============
+
+When calling demjson functions and classes from a Python 3 environment,
+be aware that there are a few differences from what is documented for
+Python 2.  This is mostly that the 'bytes' (byte array) type will
+be used or returned in some cases, where in Python 2 a string type
+may have been used.
+
+
+Decoding JSON into Python values
+--------------------------------
+
+When you decode a JSON document you can pass either a string or
+a bytes type.
+
+If you pass a string when decoding a JSON document, then it is assumed
+that the string is already a Unicode character sequence, and so the
+whole Unicode decoding step will be skipped.
+
+When you pass a 'bytes' or 'bytearray' type the decode function will
+attempt to detect the Unicode encoding and appropriately convert the
+bytes into a unicode string first.  You can override the guessed
+encoding by specifying the appropriate codec name.
+
+For example, the following are equivalent and have the same result:
+
+    demjson.decode( '"\u2014"' )
+    demjson.decode( b'"\xe2\x80\x94"' )
+    demjson.decode( bytes([ 0x22, 0xE2, 0x80, 0x94, 0x22 ]) )
+
+Notice that with the last two examples the decode function has
+automatically detected that the byte array was UTF-8 encoded.  You can
+of course pass in an 'encoding' argument to force the Unicode decoding
+codec to use -- though if you get this wrong a UnicodeDecodeError may
+be raised.
+
+
+Encoding Python values to JSON
+------------------------------
+
+When encoding a Python value into a JSON document, you will
+generally get a string result (which is a sequence of Unicode
+characters).
+
+However if you specify a particular encoding, then you will
+instead get a byte array as a result.
+
+    demjson.encode( "\u2012" )
+         -- returns a string of length 3
+
+    demjson.encode( "\u2012", encoding="utf-8" )
+         -- returns 5 bytes b'"\xe2\x80\x94"'
+
+
+Other notes on the 'bytes' type
+-------------------------------
+
+If you are encoding into JSON and the Python value you pass is, or
+contains, a 'bytes' a 'bytearray' value; then the resulting JSON will
+contain an array of integers, each of which is the value of one byte.
+
+For example, all of the following:
+
+    demjson.encode( b'ABC' )
+    demjson.encode( bytes([65, 66, 67]) )
+    demjson.encode( bytearray([65, 66, 67]) )
+
+return a string represenging the JSON document of  "[65,66,67]"

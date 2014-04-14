@@ -24,15 +24,17 @@ What's new
 These are the changes from 1.6 to 1.7 (released 2014-04-13).  See the
 file "docs/CHANGES.txt" for a complete history of changes.
 
- * RFC 7159 support. The new RFC (published March 2104 and which
+ * RFC 7159 support. The new RFC (published March 2014 and which
    superseded RFC 4627) relaxes the constraint that a JSON document
-   must start with an object or array.  Now any JSON value type is a
-   legal JSON document.
+   must start with an object or array.  This also brings it into
+   alignment with the ECMA-404 standard.
+
+   Now any JSON value type is a legal JSON document.
 
  * Python 3. This version supports both Python 2 and Python 3, via the
    2to3 conversion program.  When installing via setup.py or a PyPI
    distribution mechanism, this conversion should automatically
-   happern.
+   happen.
 
    Note that the API under Python 3 will be slightly different.
    Mainly there will be some cases in which byte array types are used
@@ -76,7 +78,6 @@ file "docs/CHANGES.txt" for a complete history of changes.
    wrapper around that class.
 
  * Other jsonlint improvements:
-       - Fixed bugs in reading from stdin
        - New -o option to specify output filename
        - Verbosity is on by default, new --quiet option
        - Better help text
