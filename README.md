@@ -3,19 +3,48 @@ demjson
 
 <b>demjson</b> is a [Python language](http://python.org/) module for
 encoding, decoding, and syntax-checking [JSON](http://json.org/)
-data.
+data.  It works under both Python 2 and Python 3.
 
-It attempts to be as closely conforming to the JSON specification,
+It comes with a <b>jsonlint</b> script which can be used to validate
+your JSON documents for strict conformance to the JSON specification.
+It can also reformat or pretty-print JSON documents; either by
+re-indenting or removing unnecessary whitespace for minimal/canonical
+JSON output.
+
+demjson tries to be as closely conforming to the JSON specification,
 published as [IETF RFC 7158](http://www.ietf.org/rfc/rfc7158.txt), as
 possible.  It can also be used in a non-strict mode where it is much
 closer to the JavaScript/ECMAScript syntax (published as ECMA 262).
 The demjson module has full Unicode support and can deal with very
 large numbers.
 
-It comes with a <b>jsonlint</b> tool which can be used to validate
-your JSON documents for strict conformance to the RFC specification;
-as it can also reformat them, either by re-indenting or removing
-unnecessary whitespace for minimal/canonical JSON output.
+
+Example use
+===========
+
+To use demjson from within your Python programs:
+
+```python
+    import demjson
+
+    # Convert a Python value into JSON
+    demjson.encode( {'Happy': True, 'Other': None} )
+          # returns string =>  {"Happy":true,"Other":null}
+
+    # Convert a JSON document into a Python value
+    demjson.decode( '{"Happy":true,"Other":null}' )
+          # returns dict => {'Other': None, 'Happy': True}
+```
+
+To use the accompaning "jsonlint" command script:
+
+```bash
+    # To check whether a file contains valid JSON
+    jsonlint sample.json
+
+    # To pretty-print (reformat) a JSON file
+    jsonlint --format sample.json
+```
 
 
 What's new
@@ -60,13 +89,12 @@ file "docs/CHANGES.txt" for a complete history of changes.
        - U+2029  PARAGRAPH SEPARATOR  (Category Zp)
        - U+E007F CANCEL TAG           (Category Cf)
 
- * Mutable strings: Support for the old Python type
-   "UserString.MutableString" type has been dropped.  That
-   experimental type had already been deprecated since Python 2.6 and
-   removed entirely from Python 3.  If you have code that passes a
-   MutableString to a JSON encoding function then either do not
-   upgrade to this release, or first convert such types to standard
-   strings before JSON encoding them.
+ * Mutable strings: Support for the old Python MutableString type has
+   been dropped.  That experimental type had already been deprecated
+   since Python 2.6 and removed entirely from Python 3.  If you have
+   code that passes a MutableString to a JSON encoding function then
+   either do not upgrade to this release, or first convert such types
+   to standard strings before JSON encoding them.
 
  * The "jsonlint" command script will now be installed by default.
 
@@ -102,7 +130,7 @@ library (which was actually an "absorption" of simplejson, the C
 extension module I previously mentioned, but after it had been fixed
 to repair its RFC issues).
 
-For MOST uses, the standard Python JSON library should be sufficient.
+For most uses, the standard Python JSON library should be sufficient.
 
 However demjson may still be useful for some purposes:
 
@@ -128,19 +156,62 @@ However demjson may still be useful for some purposes:
    Python's Decimal or UserString.
 
 
+Installation
+============
+
+To install, type:
+
+```bash
+   python setup.py install
+```
+
+or optionally just copy the file "demjson.py" to whereever you want.
+See "docs/INSTALL.txt" for more detailed instructions, including how
+to run the self-tests.
+
+
 More information
 ================
-See the files under the "docs" subdirectory.
 
-Complete documentation and additional information is available on the
-[demjson project homepage](http://deron.meranda.us/python/demjson/).
+See the files under the "docs" subdirectory.  The module is also
+self-documented, so within the python interpreter type:
 
-It is also available on the
-[Python Package Index](http://pypi.python.org/pypi/demjson/).
+```python
+    import demjson
+    help(demjson)
+```
+
+or from a shell command line:
+
+```bash
+    pydoc demjson
+```
+
+The "jsonlint" command script which gets installed as part of demjson
+has built-in usage instructions as well.  Just type:
+
+```bash
+   jsonlint --help
+```
+
+Complete documentation and additional information is also available on
+the project homepage at http://deron.meranda.us/python/demjson/
+
+It is also available on the Python Package Index (PyPI) at
+http://pypi.python.org/pypi/demjson/
 
 
 License
 =======
-Versions since 1.4 or newer are LGPLv3 (GNU Lesser General Public
-License, version 3 or greater).  For older versions see the
-LICENSE.txt file in the source distribution.
+
+LGPLv3 - See the included "LICENSE.txt" file.
+
+This software is Free Software and is licensed under the terms of the
+GNU LGPL (GNU Lesser General Public License).  More information is
+found at the top of the demjson.py source file and the included
+LICENSE.txt file.
+
+Releases prior to 1.4 were released under a different license, be
+sure to check the corresponding LICENSE.txt file included with them.
+
+This software was written by Deron Meranda, http://deron.meranda.us/

@@ -38,13 +38,12 @@ Version 1.7 released 2014-04-13
        - U+2029  PARAGRAPH SEPARATOR  (Category Zp)
        - U+E007F CANCEL TAG           (Category Cf)
 
- * Mutable strings: Support for the old Python type
-   "UserString.MutableString" type has been dropped.  That
-   experimental type had already been deprecated since Python 2.6 and
-   removed entirely from Python 3.  If you have code that passes a
-   MutableString to a JSON encoding function then either do not
-   upgrade to this release, or first convert such types to standard
-   strings before JSON encoding them.
+ * Mutable strings: Support for the old Python MutableString type has
+   been dropped.  That experimental type had already been deprecated
+   since Python 2.6 and removed entirely from Python 3.  If you have
+   code that passes a MutableString to a JSON encoding function then
+   either do not upgrade to this release, or first convert such types
+   to standard strings before JSON encoding them.
 
  * The "jsonlint" command script will now be installed by default.
 
