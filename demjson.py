@@ -914,7 +914,7 @@ class JSON(object):
                     '"': '\\"',
                     '\\': '\\\\'}
 
-    def __init__(self, strict=False, compactly=True, escape_unicode=False):
+    def __init__(self, strict=False, compactly=True, escape_unicode=False, encode_namedtuple_as_object=True):
         """Creates a JSON encoder/decoder object.
         
         If 'strict' is set to True, then only strictly-conforming JSON
@@ -938,11 +938,16 @@ class JSON(object):
         If you wish to extend the encoding to ba able to handle
         additional types, you should subclass this class and override
         the encode_default() method.
-        
+
+        If 'encode_namedtuple_as_object' is True, then objects of type
+        namedtuple, or subclasses of 'tuple' that have an _asdict()
+        method, will be encoded as an object rather than an array.
+
         """
         import sys, unicodedata
         self._set_strictness(strict)
         self._encode_compactly = compactly
+        self.encode_namedtuple_as_object = encode_namedtuple_as_object
         try:
             # see if we were passed a predicate function
             b = escape_unicode(u'A')
@@ -1845,7 +1850,12 @@ class JSON(object):
         encode() method instead.
 
         """
-        #print 'encode_complex_helper(chunklist=%r, obj=%r, nest_level=%r)'%(chunklist,obj,nest_level)
+
+        if isinstance(obj,tuple) and self.encode_namedtuple_as_object \
+                and hasattr(obj,'_asdict') and callable(obj._asdict):
+            # Appears to be a namedtuple, or follows similar protocol,
+            # so convert it to a dict.
+            obj = obj._asdict()
         try:
             # Is it a dictionary or UserDict?  Try iterkeys method first.
             it = obj.iterkeys()
@@ -1970,7 +1980,8 @@ class JSON(object):
 
 # ------------------------------
 
-def encode( obj, strict=False, compactly=True, escape_unicode=False, encoding=None ):
+def encode( obj, strict=False, compactly=True, escape_unicode=False, encoding=None,
+            encode_namedtuple_as_object=True ):
     """Encodes a Python object into a JSON-encoded string.
 
     If 'strict' is set to True, then only strictly-conforming JSON
@@ -1995,6 +2006,10 @@ def encode( obj, strict=False, compactly=True, escape_unicode=False, encoding=No
     be a python string which is the byte sequence encoding the JSON
     value.  As the default/recommended encoding for JSON is UTF-8,
     you should almost always pass in encoding='utf8'.
+
+    If 'encode_namedtuple_as_object' is True, then objects of type
+    namedtuple, or subclasses of 'tuple' that have an _asdict()
+    method, will be encoded as an object rather than an array.
 
     """
     import sys
@@ -2060,7 +2075,8 @@ def encode( obj, strict=False, compactly=True, escape_unicode=False, encoding=No
             else:
                 pass # Let the JSON object deal with it
 
-    j = JSON( strict=strict, compactly=compactly, escape_unicode=escape_unicode )
+    j = JSON( strict=strict, compactly=compactly, escape_unicode=escape_unicode,
+              encode_namedtuple_as_object=encode_namedtuple_as_object )
 
     unitxt = j.encode( obj )
     if encoder:

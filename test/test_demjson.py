@@ -502,6 +502,15 @@ class DemjsonTest(unittest.TestCase):
         self.assertRaises(demjson.JSONDecodeError, demjson.decode, \
                           '/*hi/*x*/42', allow_comments=True)
 
+    def testNamedTuples(self):
+        import collections
+        pt = collections.namedtuple('pt',['x','y'])
+        a = pt(7,3)
+        self.assertEqual(demjson.encode(a, encode_namedtuple_as_object=True, compactly=True),
+                         '{"x":7,"y":3}' )
+        self.assertEqual(demjson.encode(a, encode_namedtuple_as_object=False, compactly=True),
+                         '[7,3]' )
+
 def run_all_tests():
     print 'Running with demjson version', demjson.__version__
     unittest.main()

@@ -71,6 +71,30 @@ file "docs/CHANGES.txt" for a complete history of changes.
 
    Read the file "docs/PYTHON3.txt" for complete information.
 
+ * Named tuples: Objects of Python's standard 'collections.namedtuple'
+   type are now encoded into JSON as objects rather than as arrays.
+   This behavior can be changed with the 'encode_namedtuple_as_object'
+   argument to False, in which case they will be treated as a normal
+   tuple.
+
+```python
+       from collections import namedtuple
+       Point = namedtuple('Point', ['x','y'])
+       p = Point(5, 8)
+
+       demjson.encode( p )
+            # gives =>    {"x":5, "y":8}
+       demjson.encode( p, encode_namedtuple_as_object=False )
+            # gives =>    [5, 8]
+```
+
+   This behavior also applies to any object that follows the
+   namedtuple protocol, i.e., which are subclasses of 'tuple' and that
+   have an "_asdict()" method.  For example:
+
+   Note that the order of keys is necessarily preserved, but instead
+   will appear in the JSON output alphabetically.
+
  * Unicode errors: When reading JSON from raw bytes, if the input is
    not correctly encoded with the given, or auto-detected, Unicode
    encoding algorithm then a JSONDecodeError will now be raised rather
