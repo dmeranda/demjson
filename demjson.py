@@ -624,7 +624,7 @@ def utf32be_decode( obj, errors='strict' ):
 
 
 def auto_unicode_decode( s ):
-    """Takes a string and tries to convert it to a Unicode string.
+    """Takes a string (or byte array) and tries to convert it to a Unicode string.
 
     This will return a Python unicode string type corresponding to the
     input string (either str or unicode).  The character encoding is
@@ -632,48 +632,81 @@ def auto_unicode_decode( s ):
     rules specified by RFC 7158.  When in doubt it is assumed the
     input is encoded in UTF-8 (the default for JSON).
 
+    The BOM (byte order mark) if present will be stripped off of the
+    returned string.
+
     """
     if isinstance(s, unicode):
         return s
-    if len(s) < 4:
-        return s.decode('utf8')  # not enough bytes, assume default of utf-8
+    if len(s) == 0:
+        return ''.decode('utf8')
+
+    # Get the byte values of up to the first 4 bytes
+    ords = []
+    for i in range(0, min(len(s),4)):
+        x = s[i]
+        if isinstance(x, basestring):
+            x = ord(x)
+        ords.append( x )
+
     # Look for BOM marker
     import sys, codecs
-    bom2 = s[:2]
-    bom4 = s[:4]
+    if len(s) >= 2:
+        bom2 = s[:2]
+    else:
+        bom2 = None
+    if len(s) >= 4:
+        bom4 = s[:4]
+    else:
+        bom4 = None
 
-    # Assign values of first four bytes to: a, b, c, d
-    a, b, c, d = s[0], s[1], s[2], s[3]
-    if isinstance(a, basestring):
-        # This is to make both Python 2 and Python 3 happy
-        a, b, c, d = ord(a), ord(b), ord(c), ord(d)
+    # Assign values of first four bytes to: a, b, c, d; and last byte to: z
+    a, b, c, d, z = None, None, None, None, None
+    if len(s) >= 1:
+        a = ords[0]
+    if len(s) >= 2:
+        b = ords[1]
+    if len(s) >= 3:
+        c = ords[2]
+    if len(s) >= 4:
+        d = ords[3]
 
-    if bom4 == codecs.BOM_UTF32_LE:
+    z = s[-1]
+    if isinstance(z, basestring):
+        z = ord(z)
+
+    if bom4 and bom4 == codecs.BOM_UTF32_LE:
         encoding = 'utf-32le'
         s = s[4:]
-    elif bom4 == codecs.BOM_UTF32_BE:
+    elif bom4 and bom4 == codecs.BOM_UTF32_BE:
         encoding = 'utf-32be'
         s = s[4:]
-    elif bom2 == codecs.BOM_UTF16_LE:
+    elif bom2 and bom2 == codecs.BOM_UTF16_LE:
         encoding = 'utf-16le'
         s = s[2:]
-    elif bom2 == codecs.BOM_UTF16_BE:
+    elif bom2 and bom2 == codecs.BOM_UTF16_BE:
         encoding = 'utf-16be'
         s = s[2:]
-    # No BOM, so autodetect encoding used by looking at first four bytes
-    # according to RFC 4627 section 3.
-    elif a==0 and b==0 and c==0 and d!=0: # UTF-32BE
+
+    # No BOM, so autodetect encoding used by looking at first four
+    # bytes according to RFC 4627 section 3.  The first and last bytes
+    # in a JSON document will be ASCII.  The second byte will be ASCII
+    # unless the first byte was a quotation mark.
+
+    elif len(s)>=4 and a==0 and b==0 and c==0 and d!=0: # UTF-32BE  (0 0 0 x)
         encoding = 'utf-32be'
-    elif a==0 and b!=0 and c==0 and d!=0: # UTF-16BE
-        encoding = 'utf-16be'
-    elif a!=0 and b==0 and c==0 and d==0: # UTF-32LE
+    elif len(s)>=4 and a!=0 and b==0 and c==0 and d==0 and z==0: # UTF-32LE  (x 0 0 0 [... 0])
         encoding = 'utf-32le'
-    elif a!=0 and b==0 and c!=0 and d==0: # UTF-16LE
+    elif len(s)>=2 and a==0 and b!=0: # UTF-16BE  (0 x)
+        encoding = 'utf-16be'
+    elif len(s)>=2 and a!=0 and b==0 and z==0: # UTF-16LE  (x 0 [... 0])
         encoding = 'utf-16le'
-    else: #if a!=0 and b!=0 and c!=0 and d!=0: # UTF-8
-        # JSON spec says default is UTF-8, so always guess it
-        # if we can't guess otherwise
+    elif ord('\t') <= a <= 127:
+        # First byte appears to be ASCII, so guess UTF-8.
         encoding = 'utf8'
+    else:
+        raise JSONDecodeError("Can not determine the Unicode encoding for this JSON document")
+
     # Make sure the encoding is supported by Python
     try:
         cdk = codecs.lookup(encoding)
@@ -692,7 +725,11 @@ def auto_unicode_decode( s ):
             raise JSONDecodeError('this python has no codec for this character encoding',encoding)
     else:
         # Convert to unicode using a standard codec
-        unis = s.decode(encoding)
+        try:
+            unis = s.decode(encoding)
+        except UnicodeDecodeError, err:
+            # Convert UnicodeDecodeError into JSONDecodeError
+            raise JSONDecodeError("Unicode %s error: %s" % (encoding, str(err)) )
     return unis
 
 

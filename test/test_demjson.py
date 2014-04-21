@@ -199,7 +199,57 @@ class DemjsonTest(unittest.TestCase):
         self.assertEqual(demjson.encode('\0', escape_unicode=True), r'"\u0000"')
         self.assertEqual(demjson.encode(u'\u00e0', escape_unicode=True), r'"\u00e0"')
         self.assertEqual(demjson.encode(u'\u2012', escape_unicode=True), r'"\u2012"')
+
+    def testAutoDetectEncoding(self):
+        QT = ord('"')
+        TAB = ord('\t')
+        FOUR = ord('4')
+        TWO  = ord('2')
+        # Plain byte strings, without BOM
+        self.assertEqual(demjson.decode( rawbytes([ 0, 0, 0, FOUR               ]) ), 4 )  # UTF-32BE
+        self.assertEqual(demjson.decode( rawbytes([ 0, 0, 0, FOUR, 0, 0, 0, TWO ]) ), 42 )
+
+        self.assertEqual(demjson.decode( rawbytes([ FOUR, 0, 0, 0               ]) ), 4 )  # UTF-32LE
+        self.assertEqual(demjson.decode( rawbytes([ FOUR, 0, 0, 0, TWO, 0, 0, 0 ]) ), 42 )
+
+        self.assertEqual(demjson.decode( rawbytes([ 0, FOUR, 0, TWO ]) ), 42 ) # UTF-16BE
+        self.assertEqual(demjson.decode( rawbytes([ FOUR, 0, TWO, 0 ]) ), 42 ) # UTF-16LE
+
+        self.assertEqual(demjson.decode( rawbytes([ 0, FOUR ]) ), 4 )  #UTF-16BE
+        self.assertEqual(demjson.decode( rawbytes([ FOUR, 0 ]) ), 4 )  #UTF-16LE
+
+        self.assertEqual(demjson.decode( rawbytes([ FOUR, TWO ]) ), 42 )  # UTF-8
+        self.assertEqual(demjson.decode( rawbytes([ TAB, FOUR, TWO ]) ), 42 ) # UTF-8
+        self.assertEqual(demjson.decode( rawbytes([ FOUR ]) ), 4 ) # UTF-8
+
+        # With byte-order marks (BOM)
+        #    UTF-32BE
+        self.assertEqual(demjson.decode( rawbytes([ 0, 0, 0xFE, 0xFF, 0, 0, 0, FOUR ]) ), 4 )
+        self.assertRaises(demjson.JSONDecodeError,
+                          demjson.decode, rawbytes([ 0, 0, 0xFE, 0xFF, FOUR, 0, 0, 0 ]) )
+        #    UTF-32LE
+        self.assertEqual(demjson.decode( rawbytes([ 0xFF, 0xFE, 0, 0, FOUR, 0, 0, 0 ]) ), 4 )
+        self.assertRaises(demjson.JSONDecodeError,
+                          demjson.decode, rawbytes([ 0xFF, 0xFE, 0, 0, 0, 0, 0, FOUR ]) )
+        #    UTF-16BE
+        self.assertEqual(demjson.decode( rawbytes([ 0xFE, 0xFF, 0, FOUR ]) ), 4 )
+        self.assertRaises(demjson.JSONDecodeError,
+                          demjson.decode, rawbytes([ 0xFE, 0xFF, FOUR, 0 ]) )
+        #    UTF-16LE
+        self.assertEqual(demjson.decode( rawbytes([ 0xFF, 0xFE, FOUR, 0 ]) ), 4 )
+        self.assertRaises(demjson.JSONDecodeError,
+                          demjson.decode, rawbytes([ 0xFF, 0xFE, 0, FOUR ]) )
         
+        # Invalid Unicode strings
+        self.assertRaises(demjson.JSONDecodeError,
+                          demjson.decode, rawbytes([ 0 ]) )
+        self.assertRaises(demjson.JSONDecodeError,
+                          demjson.decode, rawbytes([ TAB, FOUR, TWO, 0 ]) )
+        self.assertRaises(demjson.JSONDecodeError,
+                          demjson.decode, rawbytes([ FOUR, 0, 0 ]) )
+        self.assertRaises(demjson.JSONDecodeError,
+                          demjson.decode, rawbytes([ FOUR, 0, 0, TWO ]) )
+
     def testDecodeStringRawUnicode(self):
         QT = ord('"')
         self.assertEqual(demjson.decode(rawbytes([ QT,0xC3,0xA0,QT ]),

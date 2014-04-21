@@ -1,16 +1,33 @@
-Installing demjson
+Requirements for demjson
+========================
 
-Basic installation
-==================
+demjson is a pure Python module; it does not contain any C code
+extensions. It also does not have any dependencies on any third-party
+modules; it only uses the standard Python library.
+
+It will work with both Python 2 and Python 3; though at least Python
+2.4 is recommended.  If you plan to use it with Python 3, also read
+the "docs/PYTHON3.txt" file included with this release.
+
+Note: for full Unicode support of non-BMP (Basic Multilingual Plane)
+characters, your Python interpreter must have been compiled for UCS-4
+support.  You can check this with:
+
+    import sys
+    sys.maxunicode > 0xffff  # If True you have UCS-4 support
+
+
+Installation of demjson
+=======================
 
 This software is published in the Python Package Index (PYPI),
 at <http://pypi.python.org/>, which may make it easy to install.
 If your system has either "pip" or "easy_install", then you may
 try one of the following commands to install this module:
 
-   pip install demjson
-   pip-python install demjson
-   easy_install demjson
+    pip install demjson
+    pip-python install demjson
+    easy_install demjson
 
 Otherwise, you can install it by downloading the distrubtion and
 unpacking it in some temporary directory.  Then inside that

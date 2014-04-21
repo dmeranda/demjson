@@ -71,8 +71,13 @@ file "docs/CHANGES.txt" for a complete history of changes.
 
    Read the file "docs/PYTHON3.txt" for complete information.
 
- * Unicode: When outputting JSON certain additional characters in
-   strings will now always be \u-escaped to increase compatibility
+ * Unicode errors: When reading JSON from raw bytes, if the input is
+   not correctly encoded with the given, or auto-detected, Unicode
+   encoding algorithm then a JSONDecodeError will now be raised rather
+   than a UnicodeDecodeError.
+
+ * Unicode escapes: When outputting JSON certain additional characters
+   in strings will now always be \u-escaped to increase compatibility
    with JavaScript.  This includes line terminators (which are
    forbidden in JavaScript string literals) as well as format control
    characters (which any JavaScript implementation is allowed to

@@ -48,10 +48,10 @@ Why use demjson rather than the Python standard library?
 ========================================================
 
 demjson was written before Python had any built-in JSON support in its
-standard library.  At the time there were just a handful of
-third-party libraries; and none of them were completely compliant with
-the RFC.  Also what I considered to be the best of the group
-(simplejson) was a compiled C extension.
+standard library, and there were just a handful of third-party
+libraries.  None of those at that time were completely compliant with
+the RFC, and the best of those required compiled C extensions rather
+than being pure Python code.
 
 So I wrote demjson to be:
 
@@ -59,9 +59,9 @@ So I wrote demjson to be:
  * 100% RFC compliant. It should follow the JSON specification exactly.
 
 It should be noted that Python has since added JSON into its standard
-library (which was actually an "absorption" of simplejson, the C
-extension module I previously mentioned, but after it had been fixed
-to repair its RFC issues).
+library -- which was actually an absorption of "simplejson", written
+by Bob Ippolito, and which had by then been fixed to remove bugs and
+improve RFC conformance.
 
 For most uses, the standard Python JSON library should be sufficient.
 

@@ -654,13 +654,16 @@ CLASSES
 
 FUNCTIONS
     auto_unicode_decode(s)
-        Takes a string and tries to convert it to a Unicode string.
+        Takes a string (or byte array) and tries to convert it to a Unicode string.
         
         This will return a Python unicode string type corresponding to the
         input string (either str or unicode).  The character encoding is
         guessed by looking for either a Unicode BOM prefix, or by the
         rules specified by RFC 7158.  When in doubt it is assumed the
         input is encoded in UTF-8 (the default for JSON).
+        
+        The BOM (byte order mark) if present will be stripped off of the
+        returned string.
     
     decode(txt, strict=False, encoding=None, **kw)
         Decodes a JSON-encoded string into a Python object.
