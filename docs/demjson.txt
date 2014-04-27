@@ -119,10 +119,14 @@ CLASSES
     __builtin__.object
         JSON
         jsonlint
+    exceptions.Exception(exceptions.BaseException)
+        JSONSkipHook
     exceptions.ValueError(exceptions.StandardError)
         JSONError
             JSONDecodeError
+                JSONDecodeHookError
             JSONEncodeError
+                JSONEncodeHookError
     
     class JSON(__builtin__.object)
      |  An encoder/decoder for JSON data streams.
@@ -145,7 +149,7 @@ CLASSES
      |  
      |  Methods defined here:
      |  
-     |  __init__(self, strict=False, compactly=True, escape_unicode=False)
+     |  __init__(self, strict=False, compactly=True, escape_unicode=False, encode_namedtuple_as_object=True)
      |      Creates a JSON encoder/decoder object.
      |      
      |      If 'strict' is set to True, then only strictly-conforming JSON
@@ -167,8 +171,16 @@ CLASSES
      |      if the character should be escaped or False if it should not.
      |      
      |      If you wish to extend the encoding to ba able to handle
-     |      additional types, you should subclass this class and override
-     |      the encode_default() method.
+     |      additional types, you may either:
+     |      
+     |            * subclass this class and override the encode_default()
+     |              method, or
+     |      
+     |            * set an 'encode_default' hook function (see set_hook())
+     |      
+     |      If 'encode_namedtuple_as_object' is True, then objects of type
+     |      namedtuple, or subclasses of 'tuple' that have an _asdict()
+     |      method, will be encoded as an object rather than an array.
      |  
      |  allow(self, behavior)
      |      Allow the specified behavior (turn off a strictness check).
@@ -176,6 +188,14 @@ CLASSES
      |      The list of all possible behaviors is available in the behaviors property.
      |      You can see which behaviors are currently allowed by accessing the
      |      allowed_behaviors property.
+     |  
+     |  call_hook(self, hook_name, *args, **kwargs)
+     |  
+     |  clear_all_hooks(self)
+     |      Unsets all hook callbacks, as previously set with set_hook().
+     |  
+     |  clear_hook(self, hookname)
+     |      Unsets a hook callback, as previously set with set_hook().
      |  
      |  decode(self, txt)
      |      Decodes a JSON-endoded string into a Python object.
@@ -255,7 +275,7 @@ CLASSES
      |  encode_boolean(self, b)
      |      Encodes the Python boolean into a JSON Boolean literal.
      |  
-     |  encode_composite(self, chunklist, obj, nest_level)
+     |  encode_composite(self, chunklist, obj, nest_level, obj_classification=None)
      |      Encodes just dictionaries, lists, or sequences.
      |      
      |      Basically handles any python type for which iter() can create
@@ -265,6 +285,8 @@ CLASSES
      |      encode() method instead.
      |  
      |  encode_default(self, obj, nest_level=0)
+     |      DEPRECATED.
+     |      
      |      This method is used to encode objects into JSON which are not straightforward.
      |      
      |      This method is intended to be overridden by subclasses which wish
@@ -305,6 +327,8 @@ CLASSES
      |  encode_undefined(self)
      |      Produces the ECMAScript 'undefined' keyword.
      |  
+     |  has_hook(self, hook_name)
+     |  
      |  islineterm(self, c)
      |      Determines if the given character is considered a line terminator.
      |      
@@ -324,6 +348,80 @@ CLASSES
      |      The list of all possible behaviors is available in the behaviors property.
      |      You can see which behaviors are currently prevented by accessing the
      |      prevented_behaviors property.
+     |  
+     |  set_hook(self, hookname, function)
+     |      Sets a user-defined callback function used during encoding or decoding.
+     |      
+     |      The 'hookname' argument must be a string containing the name of
+     |      one of the available hooks, listed below.
+     |      
+     |      The 'function' argument must either be None, which disables the hook,
+     |      or a callable function.  Hooks do not stack, if you set a hook it will
+     |      undo any previously set hook.
+     |      
+     |      Netsted values.  When decoding JSON that has nested objects or
+     |      arrays, the decoding hooks will be called once for every
+     |      corresponding value, even if nested.  Generally the decoding
+     |      hooks will be called from the inner-most value outward, and
+     |      then left to right.
+     |      
+     |      Skipping. Any hook function may raise a JSONSkipHook exception
+     |      if it does not wish to handle the particular invocation.  This
+     |      will have the effect of skipping the hook for that particular
+     |      value, as if the hook was net set.
+     |      
+     |      AVAILABLE HOOKS:
+     |      
+     |      * decode_string
+     |          Called for every JSON string literal with the
+     |          Python-equivalent string value as an argument. Expects to
+     |          get a Python object in return.
+     |      
+     |      * decode_float:
+     |          Called for every JSON number that looks like a float (has
+     |          a ".").  The string representation of the number is passed
+     |          as an argument.  Expects to get a Python object in return.
+     |      
+     |      * decode_number:
+     |          Called for every JSON number. The string representation of
+     |          the number is passed as an argument.  Expects to get a
+     |          Python object in return.  NOTE: If the number looks like a
+     |          float and the 'decode_float' hook is set, then this hook
+     |          will not be called.
+     |      
+     |      * decode_array:
+     |          Called for every JSON array. A Python list is passed as
+     |          the argument, and expects to get a Python object back.
+     |          NOTE: this hook will get called for every array, even
+     |          for nested arrays.
+     |      
+     |      * decode_object:
+     |          Called for every JSON object.  A Python dictionary is passed
+     |          as the argument, and expects to get a Python object back.
+     |          NOTE: this hook will get called for every object, even
+     |          for nested objects.
+     |      
+     |      * encode_value:
+     |          Called for every Python object which is to be encoded into JSON.
+     |      
+     |      * encode_dict:
+     |          Called for every Python dictionary or anything that looks
+     |          like a dictionary.
+     |      
+     |      * encode_dict_key:
+     |          Called for every dictionary key.
+     |      
+     |      * encode_sequence:
+     |          Called for every Python sequence-like object that is not a
+     |          dictionary or string. This includes lists and tuples.
+     |      
+     |      * encode_bytes:
+     |          Called for every Python bytes or bytearray type; or for
+     |          any memoryview with a byte ('B') item type.  (Python 3 only)
+     |      
+     |      * encode_default:
+     |          Called for any Python type which can not otherwise be converted
+     |          into JSON, even after applying any other encoding hooks.
      |  
      |  skip_comment(self, txt, i=0)
      |      Skips an ECMAScript comment, either // or /* style.
@@ -358,6 +456,8 @@ CLASSES
      |          U+200B   ZERO WIDTH SPACE
      |          U+2060   WORD JOINER
      |  
+     |  try_encode_default(self, obj, nest_level=0)
+     |  
      |  ----------------------------------------------------------------------
      |  Data descriptors defined here:
      |  
@@ -378,6 +478,11 @@ CLASSES
      |  
      |  strict
      |      True if adherence to RFC 7158 syntax is strict, or False is more generous ECMAScript syntax is permitted
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |  
+     |  all_hook_names = ('decode_number', 'decode_float', 'decode_object', 'd...
     
     class JSONDecodeError(JSONError)
      |  An exception class raised when a JSON decoding error (syntax error) occurs.
@@ -406,6 +511,83 @@ CLASSES
      |  
      |  __init__(...)
      |      x.__init__(...) initializes x; see help(type(x)) for signature
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes inherited from exceptions.ValueError:
+     |  
+     |  __new__ = <built-in method __new__ of type object>
+     |      T.__new__(S, ...) -> a new object with type S, a subtype of T
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from exceptions.BaseException:
+     |  
+     |  __delattr__(...)
+     |      x.__delattr__('name') <==> del x.name
+     |  
+     |  __getattribute__(...)
+     |      x.__getattribute__('name') <==> x.name
+     |  
+     |  __getitem__(...)
+     |      x.__getitem__(y) <==> x[y]
+     |  
+     |  __getslice__(...)
+     |      x.__getslice__(i, j) <==> x[i:j]
+     |      
+     |      Use of negative indices is not supported.
+     |  
+     |  __reduce__(...)
+     |  
+     |  __repr__(...)
+     |      x.__repr__() <==> repr(x)
+     |  
+     |  __setattr__(...)
+     |      x.__setattr__('name', value) <==> x.name = value
+     |  
+     |  __setstate__(...)
+     |  
+     |  __str__(...)
+     |      x.__str__() <==> str(x)
+     |  
+     |  __unicode__(...)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from exceptions.BaseException:
+     |  
+     |  __dict__
+     |  
+     |  args
+     |  
+     |  message
+    
+    class JSONDecodeHookError(JSONDecodeError)
+     |  An exception that occured within a decoder hook.
+     |  
+     |  The original exception is available in the 'hook_exception' attribute.
+     |  
+     |  Method resolution order:
+     |      JSONDecodeHookError
+     |      JSONDecodeError
+     |      JSONError
+     |      exceptions.ValueError
+     |      exceptions.StandardError
+     |      exceptions.Exception
+     |      exceptions.BaseException
+     |      __builtin__.object
+     |  
+     |  Methods defined here:
+     |  
+     |  __init__(self, hook_name, exc_info, encoded_obj, *args, **kwargs)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from JSONError:
+     |  
+     |  pretty_description(self)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from JSONError:
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
      |  
      |  ----------------------------------------------------------------------
      |  Data and other attributes inherited from exceptions.ValueError:
@@ -529,6 +711,83 @@ CLASSES
      |  
      |  message
     
+    class JSONEncodeHookError(JSONEncodeError)
+     |  An exception that occured within an encoder hook.
+     |  
+     |  The original exception is available in the 'hook_exception' attribute.
+     |  
+     |  Method resolution order:
+     |      JSONEncodeHookError
+     |      JSONEncodeError
+     |      JSONError
+     |      exceptions.ValueError
+     |      exceptions.StandardError
+     |      exceptions.Exception
+     |      exceptions.BaseException
+     |      __builtin__.object
+     |  
+     |  Methods defined here:
+     |  
+     |  __init__(self, hook_name, exc_info, encoded_obj, *args, **kwargs)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from JSONError:
+     |  
+     |  pretty_description(self)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from JSONError:
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes inherited from exceptions.ValueError:
+     |  
+     |  __new__ = <built-in method __new__ of type object>
+     |      T.__new__(S, ...) -> a new object with type S, a subtype of T
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from exceptions.BaseException:
+     |  
+     |  __delattr__(...)
+     |      x.__delattr__('name') <==> del x.name
+     |  
+     |  __getattribute__(...)
+     |      x.__getattribute__('name') <==> x.name
+     |  
+     |  __getitem__(...)
+     |      x.__getitem__(y) <==> x[y]
+     |  
+     |  __getslice__(...)
+     |      x.__getslice__(i, j) <==> x[i:j]
+     |      
+     |      Use of negative indices is not supported.
+     |  
+     |  __reduce__(...)
+     |  
+     |  __repr__(...)
+     |      x.__repr__() <==> repr(x)
+     |  
+     |  __setattr__(...)
+     |      x.__setattr__('name', value) <==> x.name = value
+     |  
+     |  __setstate__(...)
+     |  
+     |  __str__(...)
+     |      x.__str__() <==> str(x)
+     |  
+     |  __unicode__(...)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from exceptions.BaseException:
+     |  
+     |  __dict__
+     |  
+     |  args
+     |  
+     |  message
+    
     class JSONError(exceptions.ValueError)
      |  Our base class for all JSON-related errors.
      |  
@@ -558,6 +817,75 @@ CLASSES
      |  
      |  ----------------------------------------------------------------------
      |  Data and other attributes inherited from exceptions.ValueError:
+     |  
+     |  __new__ = <built-in method __new__ of type object>
+     |      T.__new__(S, ...) -> a new object with type S, a subtype of T
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from exceptions.BaseException:
+     |  
+     |  __delattr__(...)
+     |      x.__delattr__('name') <==> del x.name
+     |  
+     |  __getattribute__(...)
+     |      x.__getattribute__('name') <==> x.name
+     |  
+     |  __getitem__(...)
+     |      x.__getitem__(y) <==> x[y]
+     |  
+     |  __getslice__(...)
+     |      x.__getslice__(i, j) <==> x[i:j]
+     |      
+     |      Use of negative indices is not supported.
+     |  
+     |  __reduce__(...)
+     |  
+     |  __repr__(...)
+     |      x.__repr__() <==> repr(x)
+     |  
+     |  __setattr__(...)
+     |      x.__setattr__('name', value) <==> x.name = value
+     |  
+     |  __setstate__(...)
+     |  
+     |  __str__(...)
+     |      x.__str__() <==> str(x)
+     |  
+     |  __unicode__(...)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from exceptions.BaseException:
+     |  
+     |  __dict__
+     |  
+     |  args
+     |  
+     |  message
+    
+    class JSONSkipHook(exceptions.Exception)
+     |  An exception to be raised by user-defined code within hook
+     |  callbacks to indicate the callback does not want to handle the
+     |  situation.
+     |  
+     |  Method resolution order:
+     |      JSONSkipHook
+     |      exceptions.Exception
+     |      exceptions.BaseException
+     |      __builtin__.object
+     |  
+     |  Data descriptors defined here:
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from exceptions.Exception:
+     |  
+     |  __init__(...)
+     |      x.__init__(...) initializes x; see help(type(x)) for signature
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes inherited from exceptions.Exception:
      |  
      |  __new__ = <built-in method __new__ of type object>
      |      T.__new__(S, ...) -> a new object with type S, a subtype of T
@@ -668,19 +996,25 @@ FUNCTIONS
     decode(txt, strict=False, encoding=None, **kw)
         Decodes a JSON-encoded string into a Python object.
         
+        Strictness:
+        -----------
         If 'strict' is set to True, then those strings that are not
-        entirely strictly conforming to JSON will result in a
+        absolutely strictly conforming to JSON will result in a
         JSONDecodeError exception.
         
+        Unicode decoding:
+        -----------------
         The input string can be either a python string or a python unicode
-        string.  If it is already a unicode string, then it is assumed
-        that no character set decoding is required.
+        string (or a byte array in Python 3).  If it is already a unicode
+        string, then it is assumed that no character set decoding is
+        required.
         
-        However, if you pass in a non-Unicode text string (i.e., a python
-        type 'str') then an attempt will be made to auto-detect and decode
-        the character encoding.  This will be successful if the input was
-        encoded in any of UTF-8, UTF-16 (BE or LE), or UTF-32 (BE or LE),
-        and of course plain ASCII works too.
+        However, if you pass in a non-Unicode text string (a Python 2
+        'str' type or a Python 3 'bytes' or 'bytearray') then an attempt
+        will be made to auto-detect and decode the character encoding.
+        This will be successful if the input was encoded in any of UTF-8,
+        UTF-16 (BE or LE), or UTF-32 (BE or LE), and of course plain ASCII
+        works too.
         
         Note though that if you know the character encoding, then you
         should convert to a unicode string yourself, or pass it the name
@@ -689,6 +1023,8 @@ FUNCTIONS
         
             python_object = demjson.decode( input_bytes, encoding='utf8' )
         
+        Optional behaviors:
+        -------------------
         Optional keywords arguments must be of the form
             allow_xxxx=True/False
         or
@@ -698,6 +1034,14 @@ FUNCTIONS
         then by also passing 'allow_comments=True' then comments will be
         allowed.  If strict=False then prevent_comments=True will allow
         everything except comments.
+        
+        Callback hooks:
+        ---------------
+        You may supply callback hooks by using the hook name as the
+        named argument, such as:
+            decode_float=decimal.Decimal
+        
+        See the hooks documentation on the JSON.set_hook() method.
     
     decode_hex(hexstring)
         Decodes a hexadecimal string into it's integer value.
@@ -708,7 +1052,7 @@ FUNCTIONS
     determine_float_precision()
         Returns a tuple (significant_digits, max_exponent) for the float type.
     
-    encode(obj, strict=False, compactly=True, escape_unicode=False, encoding=None)
+    encode(obj, strict=False, compactly=True, escape_unicode=False, encoding=None, encode_namedtuple_as_object=True, **kw)
         Encodes a Python object into a JSON-encoded string.
         
         If 'strict' is set to True, then only strictly-conforming JSON
@@ -733,6 +1077,10 @@ FUNCTIONS
         be a python string which is the byte sequence encoding the JSON
         value.  As the default/recommended encoding for JSON is UTF-8,
         you should almost always pass in encoding='utf8'.
+        
+        If 'encode_namedtuple_as_object' is True, then objects of type
+        namedtuple, or subclasses of 'tuple' that have an _asdict()
+        method, will be encoded as an object rather than an array.
     
     extend_and_flatten_list_with_sep(orig_seq, extension_seq, separator='')
     

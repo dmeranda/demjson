@@ -2,12 +2,17 @@
 # -*- coding: utf-8 -*-
 """This module tests demjson.py using unittest.
 
+NOTE ON PYTHON 3: If running in Python 3, you must transform this test
+                  script with "2to3" first.
+
 """
 
 import sys, os, time
 import unittest
 import string
 import unicodedata
+import collections
+import datetime
 
 # Force PYTHONPATH to head of sys.path, as the easy_install (egg files) will
 # have rudely forced itself ahead of PYTHONPATH.
@@ -18,12 +23,71 @@ for pos, name in enumerate(os.environ.get('PYTHONPATH','').split(os.pathsep)):
 
 import demjson
 
+# ------------------------------
+# Python version-specific stuff...
+
+is_python3 = (sys.version_info.major >= 3)
+
+if hasattr(unittest, 'skipUnless'):
+    def skipUnlessPython3(method):
+        return unittest.skipUnless(method, is_python3)
+else:
+    # Python <= 2.6 does not have skip* decorators, so
+    # just make a dummy decorator that always passes the
+    # test method.
+    def skipUnlessPython3(method):
+        def always_pass(self):
+            print "\nSKIPPING TEST %s: Requires Python 3" % method.__name__
+            return True
+        return always_pass
+
+## ------------------------------
+
 def rawbytes( byte_list ):
-    if sys.version_info.major >= 3:
+    if is_python3:
         b = bytes( byte_list )
     else:
         b = ''.join(chr(n) for n in byte_list)
     return b
+
+## ------------------------------
+
+try:
+    import UserDict
+    dict_mixin = UserDict.DictMixin
+except ImportError:
+    # Python 3 has no UserDict. MutableMapping is close, but must
+    # supply own __iter__() and __len__() methods.
+    dict_mixin = collections.MutableMapping
+
+# A class that behaves like a dict, but is not a subclass of dict
+class LetterOrdDict(dict_mixin):
+    def __init__(self, letters):
+        self._letters = letters
+    def __getitem__(self,key):
+        try:
+            if key in self._letters:
+                return ord(key)
+        except TypeError:
+            raise KeyError('Key of wrong type: %r' % key)
+        raise KeyError('No such key', key)
+    def __setitem__(self,key): raise RuntimeError('read only object')
+    def __delitem__(self,key): raise RuntimeError('read only object')
+    def keys(self):
+        return list(self._letters)
+    def __len__(self):
+        return len(self._letters)
+    def __iter__(self):
+        for v in self._letters:
+            yield v
+
+## ------------------------------
+
+if is_python3:
+    def hexencode_bytes( bytelist ):
+        return ''.join( ['%02x' % n for n in bytelist] )
+
+## ============================================================
 
 class DemjsonTest(unittest.TestCase):
     """This class contains test cases for demjson.
@@ -405,26 +469,10 @@ class DemjsonTest(unittest.TestCase):
         """Makes sure it can encode things which look like dictionarys but aren't.
 
         """
-        try:
-            import UserDict
-            mixin = UserDict.DictMixin
-        except ImportError:
-            # Python3?  No UserDict
-            mixin = object
-        class LikeDict(mixin):
-            def __getitem__(self,key):
-                import string
-                if key in string.ascii_uppercase:
-                    return ord(key)
-                raise KeyError('No such key', key)
-            def __setitem__(self,key): raise RuntimeError('read only object')
-            def __delitem__(self,key): raise RuntimeError('read only object')
-            def keys(self):
-                import string
-                return list(string.ascii_uppercase)
-        mydict = LikeDict()
-        self.assertEqual(demjson.encode(mydict), \
-                         '{' + ','.join(['"%s":%d'%(c,ord(c)) for c in string.ascii_uppercase]) + '}' )
+        letters = 'ABCDEFGHIJKL'
+        mydict = LetterOrdDict( letters )
+        self.assertEqual( demjson.encode(mydict),
+                          '{' + ','.join(['"%s":%d'%(c,ord(c)) for c in letters]) + '}' )
 
     def testEncodeArrayLike(self):
         class LikeList(object):
@@ -510,6 +558,197 @@ class DemjsonTest(unittest.TestCase):
                          '{"x":7,"y":3}' )
         self.assertEqual(demjson.encode(a, encode_namedtuple_as_object=False, compactly=True),
                          '[7,3]' )
+
+    def testDecodeNumberHook(self):
+        """Tests the 'decode_number' and 'decode_float' hooks."""
+        def round_plus_one(s):
+            return round(float(s)) + 1
+        def negate(s):
+            if s.startswith('-'):
+                return float( s[1:] )
+            else:
+                return float( '-' + s )
+        def xnonnum(s):
+            if s=='NaN':
+                return 'x-not-a-number'
+            elif s=='Infinity' or s=='+Infinity':
+                return 'x-infinity'
+            elif s=='-Infinity':
+                return 'x-neg-infinity'
+            else:
+                raise demjson.JSONSkipHook
+        self.assertEqual(demjson.decode('[3.14,-2.7]'),
+                         [3.14, -2.7] )
+        self.assertEqual(demjson.decode('[3.14,-2.7]',decode_number=negate),
+                         [-3.14, 2.7] )
+        self.assertEqual(demjson.decode('[3.14,-2.7]',decode_number=round_plus_one),
+                         [4.0, -2.0] )
+        self.assertEqual(demjson.decode('[3.14,-2.7,8]',decode_float=negate),
+                         [-3.14, 2.7, 8] )
+        self.assertEqual(demjson.decode('[3.14,-2.7,8]',decode_float=negate,decode_number=round_plus_one),
+                         [-3.14, 2.7, 9.0] )
+        self.assertEqual(demjson.decode('[2,3.14,NaN,Infinity,+Infinity,-Infinity]',
+                                        strict=False, decode_number=xnonnum),
+                         [2, 3.14, 'x-not-a-number', 'x-infinity', 'x-infinity', 'x-neg-infinity'] )
+
+    def testDecodeArrayHook(self):
+        def reverse(arr):
+            return list(reversed(arr))
+        self.assertEqual(demjson.decode('[3, 8, 9, [1, 3, 5]]'),
+                         [3, 8, 9, [1, 3, 5]] )
+        self.assertEqual(demjson.decode('[3, 8, 9, [1, 3, 5]]', decode_array=reverse),
+                         [[5, 3, 1], 9, 8, 3] )
+        self.assertEqual(demjson.decode('[3, 8, 9, [1, 3, 5]]', decode_array=sum),
+                         29 )
+
+    def testDecodeObjectHook(self):
+        def pairs(dct):
+            return sorted(dct.items())
+        self.assertEqual(demjson.decode('{"a":42, "b":{"c":99}}'),
+                         {u'a': 42, u'b': {u'c': 99}} )
+        self.assertEqual(demjson.decode('{"a":42, "b":{"c":99}}', decode_object=pairs),
+                         [(u'a', 42), (u'b', [(u'c', 99)])] )
+
+    def testDecodeStringHook(self):
+        import string
+        def s2num( s ):
+            try:
+                s = int(s)
+            except ValueError:
+                pass
+            return s
+        doc = '{"one":["two","three",{"four":"005"}]}'
+        self.assertEqual(demjson.decode(doc),
+                         {'one':['two','three',{'four':'005'}]} )
+        self.assertEqual(demjson.decode(doc, decode_string=lambda s: s.capitalize()),
+                         {'One':['Two','Three',{'Four':'005'}]} )
+        self.assertEqual(demjson.decode(doc, decode_string=s2num),
+                         {'one':['two','three',{'four':5}]} )
+
+
+    def testEncodeDictKey(self):
+        d1 = {42: "forty-two", "a":"Alpha"}
+        d2 = {complex(0,42): "imaginary-forty-two", "a":"Alpha"}
+
+        def make_key( k ):
+            if isinstance(k,basestring):
+                raise demjson.JSONSkipHook
+            else:
+                return repr(k)
+
+        def make_key2( k ):
+            if isinstance(k, (int,basestring)):
+                raise demjson.JSONSkipHook
+            else:
+                return repr(k)
+
+        self.assertRaises(demjson.JSONEncodeError, demjson.encode, \
+                          d1, strict=True)
+        self.assertEqual(demjson.encode(d1,strict=False),
+                         '{"a":"Alpha",42:"forty-two"}' )
+
+        self.assertEqual(demjson.encode(d1, encode_dict_key=make_key),
+                         '{"42":"forty-two","a":"Alpha"}' )
+        self.assertEqual(demjson.encode(d1,strict=False, encode_dict_key=make_key2),
+                         '{"a":"Alpha",42:"forty-two"}' )
+
+        self.assertRaises(demjson.JSONEncodeError, demjson.encode, \
+                          d2, strict=True)
+        self.assertEqual(demjson.encode(d2, encode_dict_key=make_key),
+                         '{"%r":"imaginary-forty-two","a":"Alpha"}' % complex(0,42) )
+
+    def testEncodeDict(self):
+        def d2pairs( d ):
+            return sorted( d.items() )
+        def add_keys( d ):
+            d['keys'] = list(sorted(d.keys()))
+            return d
+
+        d = {"a":42, "b":{"c":99,"d":7}}
+        self.assertEqual(demjson.encode( d, encode_dict=d2pairs ),
+                         '[["a",42],["b",[["c",99],["d",7]]]]' )
+        self.assertEqual(demjson.encode( d, encode_dict=add_keys ),
+                         '{"a":42,"b":{"c":99,"d":7,"keys":["c","d"]},"keys":["a","b"]}' )
+
+    def testEncodeSequence(self):
+        def list2hash( seq ):
+            return dict(enumerate(seq))
+        d = [1,2,3,[4,5,6],7,8]
+        self.assertEqual(demjson.encode( d, encode_sequence=reversed ),
+                         '[8,7,[6,5,4],3,2,1]' )
+        self.assertEqual(demjson.encode( d, encode_sequence=list2hash ),
+                         '{0:1,1:2,2:3,3:{0:4,1:5,2:6},4:7,5:8}' )
+
+    @skipUnlessPython3
+    def testEncodeBytes(self):
+        no_bytes = bytes([])
+        all_bytes = bytes( list(range(256)) )
+
+        self.assertEqual(demjson.encode( no_bytes ),
+                         '[]' )
+        self.assertEqual(demjson.encode( all_bytes ),
+                         '[' + ','.join([str(n) for n in all_bytes]) + ']' )
+
+        self.assertEqual(demjson.encode( no_bytes, encode_bytes=hexencode_bytes ),
+                         '""' )
+        self.assertEqual(demjson.encode( all_bytes, encode_bytes=hexencode_bytes ),
+                         '"' + hexencode_bytes(all_bytes) + '"' )
+
+
+    def testEncodeValue(self):
+        def enc_val( val ):
+            if isinstance(val, complex):
+                return {'real':val.real, 'imaginary':val.imag}
+            elif isinstance(val, basestring):
+                return val.upper()
+            elif isinstance(val, datetime.date):
+                return val.strftime("Year %Y Month %m Day %d")
+            else:
+                raise demjson.JSONSkipHook
+
+        v = {'ten':10, 'number': complex(3, 7.1), 'asof': datetime.date(2014,1,17)}
+        self.assertEqual(demjson.encode( v, encode_value=enc_val ),
+                         u'{"ASOF":"YEAR 2014 MONTH 01 DAY 17","NUMBER":{"IMAGINARY":7.1,"REAL":3.0},"TEN":10}' )
+
+    def testEncodeDefault(self):
+        import datetime
+        def dictkeys( d ):
+            return "/".join( sorted([ str(k) for k in d.keys() ]) )
+        def magic( d ):
+            return complex( 1, len(d))
+
+        vals = [ "abc", 123, datetime.date(2014,1,17), sys, {'a':42,'wow':True} ]
+
+        self.assertEqual(demjson.encode( vals, encode_default=repr ),
+                         u'["abc",123,"%s","%s",{"a":42,"wow":true}]' % ( repr(vals[2]), repr(vals[3])) )
+
+        self.assertEqual(demjson.encode( vals, encode_default=repr, encode_dict=dictkeys ),
+                         u'["abc",123,"%s","%s","a/wow"]' % ( repr(vals[2]), repr(vals[3])) )
+
+        self.assertEqual(demjson.encode( vals, encode_default=repr, encode_dict=magic ),
+                         u'["abc",123,"%s","%s","%s"]' % ( repr(vals[2]), repr(vals[3]), repr(magic(vals[4])) ) )
+
+
+    def testEncodeDefaultMethod(self):
+        class Anon(object):
+            def __init__(self, val):
+                self.v = val
+
+        class MyJSON(demjson.JSON):
+            def encode_default(self, obj, nest_level=0 ):
+                if isinstance(obj,Anon):
+                    return obj.v
+                raise demjson.JSONEncodeError("Default case not handled")
+
+        def check_orig(v):
+            j = demjson.JSON()
+            return j.encode(v)
+
+        self.assertRaises( demjson.JSONEncodeError, check_orig, Anon("Hello") )
+
+        myj = MyJSON()
+        self.assertEqual( myj.encode( Anon("Hello") ), '"Hello"' )
+
 
 def run_all_tests():
     print 'Running with demjson version', demjson.__version__

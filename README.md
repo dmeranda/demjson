@@ -53,14 +53,14 @@ What's new
 These are the changes from 1.6 to 1.7 (released 2014-04-13).  See the
 file "docs/CHANGES.txt" for a complete history of changes.
 
- * RFC 7159 support. The new RFC (published March 2014 and which
+ * RFC 7159 conformance: The new RFC (published March 2014 and which
    superseded RFC 4627) relaxes the constraint that a JSON document
    must start with an object or array.  This also brings it into
    alignment with the ECMA-404 standard.
 
    Now any JSON value type is a legal JSON document.
 
- * Python 3. This version supports both Python 2 and Python 3, via the
+ * Python 3: This version supports both Python 2 and Python 3, via the
    2to3 conversion program.  When installing via setup.py or a PyPI
    distribution mechanism, this conversion should automatically
    happen.
@@ -71,11 +71,31 @@ file "docs/CHANGES.txt" for a complete history of changes.
 
    Read the file "docs/PYTHON3.txt" for complete information.
 
- * Named tuples: Objects of Python's standard 'collections.namedtuple'
-   type are now encoded into JSON as objects rather than as arrays.
-   This behavior can be changed with the 'encode_namedtuple_as_object'
-   argument to False, in which case they will be treated as a normal
-   tuple.
+ * Subclassing: Subclassing the demjson.JSON class is now highly
+   discouraged as future changes may alter the method parameters or
+   names.
+
+   In particular overriding the encode_default() method is now
+   DEPRECATED!  It will continue work in this version, but will be
+   removed in a future version.
+
+   The new callback hooks (see below) should provide a better way to
+   achieve most needs that previously would have been done with
+   subclassing.
+
+ * Callback hooks: This version allows the user to provide a number
+   of different callback functions, or hooks, which can do special
+   processing.  For example when parsing JSON you could detect
+   strings that look like dates, and automatically convert them
+   into Python datetime objects instead.
+
+   Read the file "docs/HOOKS.txt" for complete information.
+
+ * Named tuples: When encoding to JSON, all named tuples (objects of
+   Python's standard 'collections.namedtuple' type) are now encoded
+   into JSON as objects rather than as arrays.  This behavior can be
+   changed with the 'encode_namedtuple_as_object' argument to False,
+   in which case they will be treated as a normal tuple.
 
 ```python
        from collections import namedtuple
@@ -90,7 +110,7 @@ file "docs/CHANGES.txt" for a complete history of changes.
 
    This behavior also applies to any object that follows the
    namedtuple protocol, i.e., which are subclasses of 'tuple' and that
-   have an "_asdict()" method.  For example:
+   have an "_asdict()" method.
 
    Note that the order of keys is necessarily preserved, but instead
    will appear in the JSON output alphabetically.
@@ -118,12 +138,13 @@ file "docs/CHANGES.txt" for a complete history of changes.
        - U+2029  PARAGRAPH SEPARATOR  (Category Zp)
        - U+E007F CANCEL TAG           (Category Cf)
 
- * Mutable strings: Support for the old Python MutableString type has
-   been dropped.  That experimental type had already been deprecated
-   since Python 2.6 and removed entirely from Python 3.  If you have
-   code that passes a MutableString to a JSON encoding function then
-   either do not upgrade to this release, or first convert such types
-   to standard strings before JSON encoding them.
+ * Mutable strings: Support for the old Python mutable strings (the
+   UserDict.MutableString type) has been dropped.  That experimental
+   type had already been deprecated since Python 2.6 and removed
+   entirely from Python 3.  If you have code that passes a
+   MutableString to a JSON encoding function then either do not
+   upgrade to this release, or first convert such types to standard
+   strings before JSON encoding them.
 
  * The "jsonlint" command script will now be installed by default.
 

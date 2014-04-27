@@ -831,6 +831,14 @@ def decode_octal( octalstring ):
 # ----------------------------------------------------------------------
 # Exception classes.
 
+class JSONSkipHook(Exception):
+    """An exception to be raised by user-defined code within hook
+    callbacks to indicate the callback does not want to handle the
+    situation.
+
+    """
+    pass
+
 class JSONError(ValueError):
     """Our base class for all JSON-related errors.
 
@@ -850,11 +858,45 @@ class JSONError(ValueError):
 
 class JSONDecodeError(JSONError):
     """An exception class raised when a JSON decoding error (syntax error) occurs."""
+    pass
 
+class JSONDecodeHookError(JSONDecodeError):
+    """An exception that occured within a decoder hook.
+    
+    The original exception is available in the 'hook_exception' attribute.
+    """
+    def __init__(self, hook_name, exc_info, encoded_obj, *args, **kwargs):
+        self.hook_name = hook_name
+        if not exc_info:
+            exc_info = (None, None, None)
+        exc_type, self.hook_exception, self.hook_traceback = exc_info
+        self.object_type = type(encoded_obj)
+        msg = "Hook %s raised %r while decoding type <%s>" % (hook_name, self.hook_exception.__class__.__name__, self.object_type.__name__)
+        if len(args) >= 1:
+            msg += ": " + args[0]
+            args = args[1:]
+        super(JSONDecodeHookError,self).__init__(msg, *args,**kwargs)
 
 class JSONEncodeError(JSONError):
     """An exception class raised when a python object can not be encoded as a JSON string."""
+    pass
 
+class JSONEncodeHookError(JSONEncodeError):
+    """An exception that occured within an encoder hook.
+    
+    The original exception is available in the 'hook_exception' attribute.
+    """
+    def __init__(self, hook_name, exc_info, encoded_obj, *args, **kwargs):
+        self.hook_name = hook_name
+        if not exc_info:
+            exc_info = (None, None, None)
+        exc_type, self.hook_exception, self.hook_traceback = exc_info
+        self.object_type = type(encoded_obj)
+        msg = "Hook %s raised %r while encoding type <%s>" % (self.hook_name, self.hook_exception.__class__.__name__, self.object_type.__name__)
+        if len(args) >= 1:
+            msg += ": " + args[0]
+            args = args[1:]
+        super(JSONEncodeHookError,self).__init__(msg, *args, **kwargs)
 
 #----------------------------------------------------------------------
 # The main JSON encoder/decoder class.
@@ -914,6 +956,9 @@ class JSON(object):
                     '"': '\\"',
                     '\\': '\\\\'}
 
+    all_hook_names = ('decode_number', 'decode_float', 'decode_object', 'decode_array', 'decode_string',
+                      'encode_value', 'encode_dict', 'encode_dict_key', 'encode_sequence', 'encode_bytes', 'encode_default')
+
     def __init__(self, strict=False, compactly=True, escape_unicode=False, encode_namedtuple_as_object=True):
         """Creates a JSON encoder/decoder object.
         
@@ -936,18 +981,26 @@ class JSON(object):
         if the character should be escaped or False if it should not.
         
         If you wish to extend the encoding to ba able to handle
-        additional types, you should subclass this class and override
-        the encode_default() method.
+        additional types, you may either:
+
+              * subclass this class and override the encode_default()
+                method, or
+
+              * set an 'encode_default' hook function (see set_hook())
 
         If 'encode_namedtuple_as_object' is True, then objects of type
         namedtuple, or subclasses of 'tuple' that have an _asdict()
         method, will be encoded as an object rather than an array.
 
         """
-        import sys, unicodedata
+        import sys, unicodedata, re
+        self._numberlike_re = re.compile('^([-+0-9.a-zA-Z]+)')
+
         self._set_strictness(strict)
         self._encode_compactly = compactly
         self.encode_namedtuple_as_object = encode_namedtuple_as_object
+        for hookname in self.all_hook_names:
+            self.set_hook( hookname, None )
         try:
             # see if we were passed a predicate function
             b = escape_unicode(u'A')
@@ -968,6 +1021,129 @@ class JSON(object):
                  and not self._rev_escapes.has_key(chr(c)) \
                  and not unicodedata.category(unichr(c)) in ['Cc','Cf','Zl','Zp']
              for c in range(0,256)]
+
+    def clear_hook(self, hookname):
+        """Unsets a hook callback, as previously set with set_hook()."""
+        self.set_hook( hookname, None )
+
+    def clear_all_hooks(self):
+        """Unsets all hook callbacks, as previously set with set_hook()."""
+        for hookname in self.all_hook_names:
+            self.clear_hook( hookname )
+
+    def set_hook(self, hookname, function):
+        """Sets a user-defined callback function used during encoding or decoding.
+
+        The 'hookname' argument must be a string containing the name of
+        one of the available hooks, listed below.
+
+        The 'function' argument must either be None, which disables the hook,
+        or a callable function.  Hooks do not stack, if you set a hook it will
+        undo any previously set hook.
+
+        Netsted values.  When decoding JSON that has nested objects or
+        arrays, the decoding hooks will be called once for every
+        corresponding value, even if nested.  Generally the decoding
+        hooks will be called from the inner-most value outward, and
+        then left to right.
+
+        Skipping. Any hook function may raise a JSONSkipHook exception
+        if it does not wish to handle the particular invocation.  This
+        will have the effect of skipping the hook for that particular
+        value, as if the hook was net set.
+
+        AVAILABLE HOOKS:
+
+        * decode_string
+            Called for every JSON string literal with the
+            Python-equivalent string value as an argument. Expects to
+            get a Python object in return.
+
+        * decode_float:
+            Called for every JSON number that looks like a float (has
+            a ".").  The string representation of the number is passed
+            as an argument.  Expects to get a Python object in return.
+
+        * decode_number:
+            Called for every JSON number. The string representation of
+            the number is passed as an argument.  Expects to get a
+            Python object in return.  NOTE: If the number looks like a
+            float and the 'decode_float' hook is set, then this hook
+            will not be called.
+
+        * decode_array:
+            Called for every JSON array. A Python list is passed as
+            the argument, and expects to get a Python object back.
+            NOTE: this hook will get called for every array, even
+            for nested arrays.
+
+        * decode_object:
+            Called for every JSON object.  A Python dictionary is passed
+            as the argument, and expects to get a Python object back.
+            NOTE: this hook will get called for every object, even
+            for nested objects.
+
+        * encode_value:
+            Called for every Python object which is to be encoded into JSON.
+
+        * encode_dict:
+            Called for every Python dictionary or anything that looks
+            like a dictionary.
+
+        * encode_dict_key:
+            Called for every dictionary key.
+
+        * encode_sequence:
+            Called for every Python sequence-like object that is not a
+            dictionary or string. This includes lists and tuples.
+
+        * encode_bytes:
+            Called for every Python bytes or bytearray type; or for
+            any memoryview with a byte ('B') item type.  (Python 3 only)
+
+        * encode_default:
+            Called for any Python type which can not otherwise be converted
+            into JSON, even after applying any other encoding hooks.
+
+        """
+        if hookname in self.all_hook_names:
+            att = hookname + '_hook'
+            if function != None and not callable(function):
+                raise ValueError("Hook %r must be None or a callable function" % hookname)
+            setattr( self, att, function )
+        else:
+            raise ValueError("Unknown hook name %r" % hookname)
+
+
+    def has_hook(self, hook_name):
+        if not hook_name or hook_name not in self.all_hook_names:
+            return False
+        hook = getattr( self, hook_name + '_hook' )
+        return hook != None
+
+
+    def call_hook(self, hook_name, *args, **kwargs):
+        import sys
+        if hook_name not in self.all_hook_names:
+            raise AttributeError("No such hook %r" % hook_name)
+        hook = getattr( self, hook_name + '_hook' )
+        try:
+            rval = hook( *args, **kwargs )
+        except JSONSkipHook:
+            raise
+        except Exception, err:
+            e2 = sys.exc_info()
+            if hook_name.startswith('encode_'):
+                ecls = JSONEncodeHookError
+            else:
+                ecls = JSONDecodeHookError
+            newerr = ecls( hook_name, e2, *args )
+            # Simulate Python 3's: "raise X from Y" exception chaining
+            newerr.__cause__ = err
+            newerr.__traceback__ = e2[2]
+            raise newerr
+        return rval
+
 
     def _set_strictness(self, strict):
         """Changes the strictness behavior.
@@ -1157,6 +1333,25 @@ class JSON(object):
         """
         if imax is None:
             imax = len(s)
+        # Use external number parser hook if available
+        if self.has_hook('decode_number') or self.has_hook('decode_float'):
+            match = self._numberlike_re.match( s[i:] )
+            if match:
+                nbr = match.group(1)
+                if '.' in nbr and self.has_hook('decode_float'):
+                    try:
+                        val = self.call_hook( 'decode_float', nbr )
+                    except JSONSkipHook:
+                        pass
+                    else:
+                        return val, i + len(nbr)
+                elif self.has_hook('decode_number'):
+                    try:
+                        val = self.call_hook( 'decode_number', nbr )
+                    except JSONSkipHook:
+                        pass
+                    else:
+                        return val, i + len(nbr)
         # Detect initial sign character(s)
         if not self._allow_all_numeric_signs:
             if s[i] == '+' or (s[i] == '-' and i+1 < imax and \
@@ -1445,6 +1640,11 @@ class JSON(object):
         if not done:
             raise JSONDecodeError('string literal is not terminated with a quotation mark',s)
         s = ''.join( chunks )
+        if self.has_hook('decode_string'):
+            try:
+                s = self.call_hook( 'decode_string', s )
+            except JSONSkipHook:
+                pass
         return s, i
 
     def encode_string(self, s):
@@ -1710,6 +1910,16 @@ class JSON(object):
                 raise JSONDecodeError('object literal (dictionary) is not terminated',txt[starti:])
             else:
                 raise JSONDecodeError('array literal (list) is not terminated',txt[starti:])
+        if isdict and self.has_hook('decode_object'):
+            try:
+                obj = self.call_hook( 'decode_object', obj )
+            except JSONSkipHook:
+                pass
+        elif self.has_hook('decode_array'):
+            try:
+                obj = self.call_hook( 'decode_array', obj )
+            except JSONSkipHook:
+                pass
         return obj, i
 
     def decode_javascript_identifier(self, name):
@@ -1816,31 +2026,92 @@ class JSON(object):
             chunks.append( u"\n" )
         return ''.join( chunks )
 
+    def _classify_for_encoding( self, obj ):
+        import sys
+        c = 'other'
+        if obj is None:
+            c = 'null'
+        elif obj is undefined:
+            c = 'undefined'
+        elif isinstance(obj,bool):
+            c =  'bool'
+        elif isinstance(obj, (int,long,float,complex)) or\
+                (decimal and isinstance(obj, decimal.Decimal)):
+            c = 'number'
+        elif isinstance(obj, basestring) or isstringtype(obj):
+            c = 'string'
+        else:
+            if isinstance(obj,dict):
+                c = 'dict'
+            elif isinstance(obj,tuple) and self.encode_namedtuple_as_object \
+                and hasattr(obj,'_asdict') and callable(obj._asdict):
+                c = 'namedtuple'
+            elif isinstance(obj, (list,tuple,set,frozenset)):
+                c =  'sequence'
+            elif hasattr(obj,'iterkeys') or (hasattr(obj,'__getitem__') and hasattr(obj,'keys')):
+                c = 'dict'
+            elif sys.version_info.major >= 3 and isinstance(obj,(bytes,bytearray)):
+                c = 'bytes'
+            elif sys.version_info.major >= 3 and isinstance(obj,memoryview):
+                c = 'memoryview'
+            else:
+                c = 'other'
+        return c
+
     def encode_helper(self, chunklist, obj, nest_level):
         #print 'encode_helper(chunklist=%r, obj=%r, nest_level=%r)'%(chunklist,obj,nest_level)
+        obj_classification = self._classify_for_encoding( obj )
+
+        if self.has_hook('encode_value'):
+            orig_obj = obj
+            try:
+                obj = self.call_hook( 'encode_value', obj )
+            except JSONSkipHook:
+                pass
+
+            if obj is not orig_obj:
+                prev_cls = obj_classification
+                obj_classification = self._classify_for_encoding( obj )
+                if obj_classification != prev_cls:
+                    # Got a different type of object, re-encode again
+                    chunklist.append( self.encode( obj, nest_level=nest_level ) )
+                    return
+
         if hasattr(obj, 'json_equivalent'):
             json = self.encode_equivalent( obj, nest_level=nest_level )
             if json is not None:
                 chunklist.append( json )
                 return
-        if obj is None:
+
+
+        if obj_classification == 'null':
             chunklist.append( self.encode_null() )
-        elif obj is undefined:
+        elif obj_classification == 'undefined':
             if self._allow_undefined_values:
                 chunklist.append( self.encode_undefined() )
             else:
                 raise JSONEncodeError('strict JSON does not permit "undefined" values')
-        elif isinstance(obj, bool):
+        elif obj_classification == 'bool':
             chunklist.append( self.encode_boolean(obj) )
-        elif isinstance(obj, (int,long,float,complex)) or \
-                 (decimal and isinstance(obj, decimal.Decimal)):
-            chunklist.append( self.encode_number(obj) )
-        elif isinstance(obj, basestring) or isstringtype(obj):
+        elif obj_classification == 'number':
+            try:
+                encoded_num = self.encode_number(obj)
+            except JSONEncodeError, err1:
+                # Bad number, probably a complex with non-zero imaginary part.
+                # Let the default encoders take a shot at encoding.
+                try:
+                    encoded_num = self.try_encode_default(obj)
+                except Exception, err2:
+                    # Default handlers couldn't deal with it, re-raise original exception.
+                    raise err1
+            chunklist.append( encoded_num )
+        elif obj_classification == 'string':
             chunklist.append( self.encode_string(obj) )
         else:
+            # Anything left is probably composite, or an unconvertable type.
             self.encode_composite(chunklist, obj, nest_level)
 
-    def encode_composite(self, chunklist, obj, nest_level):
+    def encode_composite(self, chunklist, obj, nest_level, obj_classification=None):
         """Encodes just dictionaries, lists, or sequences.
 
         Basically handles any python type for which iter() can create
@@ -1850,25 +2121,64 @@ class JSON(object):
         encode() method instead.
 
         """
+        import sys
+        if not obj_classification:
+            obj_classification = self._classify_for_encoding(obj)
 
-        if isinstance(obj,tuple) and self.encode_namedtuple_as_object \
-                and hasattr(obj,'_asdict') and callable(obj._asdict):
-            # Appears to be a namedtuple, or follows similar protocol,
-            # so convert it to a dict.
+        # Convert namedtuples to dictionaries
+        if obj_classification == 'namedtuple':
             obj = obj._asdict()
-        try:
-            # Is it a dictionary or UserDict?  Try iterkeys method first.
-            it = obj.iterkeys()
-        except AttributeError:
+            obj_classification = 'dict'
+
+        # Convert 'unsigned byte' memory views into plain bytes
+        if obj_classification == 'memoryview' and obj.format == 'B':
+            obj = obj.tobytes()
+            obj_classification = 'bytes'
+
+        # Run hooks
+        hook_name = None
+        if obj_classification == 'dict':
+            hook_name = 'encode_dict'
+        elif obj_classification == 'sequence':
+            hook_name = 'encode_sequence'
+        elif obj_classification == 'bytes':
+            hook_name = 'encode_bytes'
+
+        if self.has_hook(hook_name):
             try:
-                # Is it a sequence?  Try to make an iterator for it.
+                new_obj = self.call_hook( hook_name, obj )
+            except JSONSkipHook:
+                pass
+            else:
+                if new_obj is not obj:
+                    obj = new_obj
+                    prev_cls = obj_classification
+                    obj_classification = self._classify_for_encoding( obj )
+                    if obj_classification != prev_cls:
+                        # Transformed to a different kind of object, call
+                        # back to the general encode() method.
+                        chunklist.append( self.encode( obj, nest_level=nest_level ) )
+                        return
+                    # Else, fall through
+
+        # At his point we have decided to do with an object or an array
+        isdict = (obj_classification == 'dict')
+
+        # Get iterator
+        it = None
+        if isdict and hasattr(obj,'iterkeys'):
+            try:
+                it = obj.iterkeys()
+            except AttributeError:
+                pass
+        else:
+            try:
                 it = iter(obj)
             except TypeError:
-                it = None
+                pass
+
+        # Convert each member to JSON
         if it is not None:
-            # Does it look like a dictionary?  Check for a minimal dict or
-            # UserDict interface.
-            isdict = hasattr(obj, '__getitem__') and hasattr(obj, 'keys')
             compactly = self._encode_compactly
             if isdict:
                 chunklist.append('{')
@@ -1890,28 +2200,42 @@ class JSON(object):
                     obj2 = it.next()
                     if obj2 is obj:
                         raise JSONEncodeError('trying to encode an infinite sequence',obj)
-                    if isdict and not isstringtype(obj2):
+                    if isdict:
+                        obj3 = obj[obj2]
+                        # Dictionary key is in obj2 and value in obj3.
+
+                        # Let any hooks transform the key.
+                        if self.has_hook('encode_value'):
+                            try:
+                                newobj = self.call_hook( 'encode_value', obj2 )
+                            except JSONSkipHook:
+                                pass
+                            else:
+                                obj2 = newobj
+                        if self.has_hook('encode_dict_key'):
+                            try:
+                                newkey = self.call_hook( 'encode_dict_key', obj2 )
+                            except JSONSkipHook:
+                                pass
+                            else:
+                                obj2 = newkey
+
                         # Check JSON restrictions on key types
-                        if isnumbertype(obj2):
-                            if not self._allow_nonstring_keys:
-                                raise JSONEncodeError('object properties (dictionary keys) must be strings in strict JSON',obj2)
-                        else:
-                            raise JSONEncodeError('object properties (dictionary keys) can only be strings or numbers in ECMAScript',obj2)
+                        if not isstringtype(obj2):
+                            if isnumbertype(obj2):
+                                if not self._allow_nonstring_keys:
+                                    raise JSONEncodeError('object properties (dictionary keys) must be strings in strict JSON',obj2)
+                            else:
+                                raise JSONEncodeError('object properties (dictionary keys) can only be strings or numbers in ECMAScript',obj2)
 
                     # Encode this item in the sequence and put into item_chunks
                     item_chunks = []
                     self.encode_helper( item_chunks, obj2, nest_level=nest_level+1 )
                     if isdict:
                         item_chunks.append(dictcolon)
-                        obj3 = obj[obj2]
                         self.encode_helper(item_chunks, obj3, nest_level=nest_level+2)
 
-                    #print nest_level, numitems, 'item:', repr(obj2)
-                    #print nest_level, numitems, 'sequence_chunks:', repr(sequence_chunks)
-                    #print nest_level, numitems, 'item_chunks:', repr(item_chunks)
-                    #extend_list_with_sep(sequence_chunks, item_chunks)
                     sequence_chunks.append(item_chunks)
-                    #print nest_level, numitems, 'new sequence_chunks:', repr(sequence_chunks)
                     numitems += 1
             except StopIteration:
                 pass
@@ -1938,9 +2262,10 @@ class JSON(object):
                 chunklist.append('}')
             else:
                 chunklist.append(']')
-        else: # Can't create an iterator for the object
-            json2 = self.encode_default( obj, nest_level=nest_level )
-            chunklist.append( json2 )
+        else: # Can not get iterator, must be an unknown type
+            json_fragment = self.try_encode_default( obj, nest_level=nest_level )
+            chunklist.append( json_fragment )
+
 
     def encode_equivalent( self, obj, nest_level=0 ):
         """This method is used to encode user-defined class objects.
@@ -1968,8 +2293,31 @@ class JSON(object):
         else:
             return None
 
-    def encode_default( self, obj, nest_level=0 ):
-        """This method is used to encode objects into JSON which are not straightforward.
+    def try_encode_default( self, obj, nest_level=0 ):
+        orig_obj = obj
+        if self.has_hook('encode_default'):
+            try:
+                obj = self.call_hook( 'encode_default', obj )
+            except JSONSkipHook:
+                pass
+            else:
+                if obj is not orig_obj:
+                    # Hook made a transformation, re-encode it
+                    return self.encode( obj, nest_level=nest_level )
+
+        # The last chance... encode_default method (possibly overridden by subclass)
+        obj =self.encode_default( obj, nest_level=nest_level )
+        if obj is not orig_obj:
+            return self.encode( obj, nest_level=nest_level )
+
+        # End of the road.
+        raise JSONEncodeError('can not encode object into a JSON representation',obj)
+
+
+    def encode_default(self, obj, nest_level=0):
+        """DEPRECATED.
+
+        This method is used to encode objects into JSON which are not straightforward.
 
         This method is intended to be overridden by subclasses which wish
         to extend this encoder to handle additional types.
@@ -1981,7 +2329,8 @@ class JSON(object):
 # ------------------------------
 
 def encode( obj, strict=False, compactly=True, escape_unicode=False, encoding=None,
-            encode_namedtuple_as_object=True ):
+            encode_namedtuple_as_object=True,
+            **kw ):
     """Encodes a Python object into a JSON-encoded string.
 
     If 'strict' is set to True, then only strictly-conforming JSON
@@ -2078,6 +2427,12 @@ def encode( obj, strict=False, compactly=True, escape_unicode=False, encoding=No
     j = JSON( strict=strict, compactly=compactly, escape_unicode=escape_unicode,
               encode_namedtuple_as_object=encode_namedtuple_as_object )
 
+    for keyword, value in kw.items():
+        if keyword in j.all_hook_names:
+            j.set_hook( keyword, value )
+        else:
+            raise TypeError("%s.%s(): Unknown keyword argument %r" % (__name__,'encode',keyword))
+
     unitxt = j.encode( obj )
     if encoder:
         txt = encoder( unitxt )
@@ -2093,19 +2448,25 @@ def encode( obj, strict=False, compactly=True, escape_unicode=False, encoding=No
 def decode( txt, strict=False, encoding=None, **kw ):
     """Decodes a JSON-encoded string into a Python object.
 
+    Strictness:
+    -----------
     If 'strict' is set to True, then those strings that are not
-    entirely strictly conforming to JSON will result in a
+    absolutely strictly conforming to JSON will result in a
     JSONDecodeError exception.
 
+    Unicode decoding:
+    -----------------
     The input string can be either a python string or a python unicode
-    string.  If it is already a unicode string, then it is assumed
-    that no character set decoding is required.
+    string (or a byte array in Python 3).  If it is already a unicode
+    string, then it is assumed that no character set decoding is
+    required.
 
-    However, if you pass in a non-Unicode text string (i.e., a python
-    type 'str') then an attempt will be made to auto-detect and decode
-    the character encoding.  This will be successful if the input was
-    encoded in any of UTF-8, UTF-16 (BE or LE), or UTF-32 (BE or LE),
-    and of course plain ASCII works too.
+    However, if you pass in a non-Unicode text string (a Python 2
+    'str' type or a Python 3 'bytes' or 'bytearray') then an attempt
+    will be made to auto-detect and decode the character encoding.
+    This will be successful if the input was encoded in any of UTF-8,
+    UTF-16 (BE or LE), or UTF-32 (BE or LE), and of course plain ASCII
+    works too.
     
     Note though that if you know the character encoding, then you
     should convert to a unicode string yourself, or pass it the name
@@ -2114,6 +2475,8 @@ def decode( txt, strict=False, encoding=None, **kw ):
 
         python_object = demjson.decode( input_bytes, encoding='utf8' )
 
+    Optional behaviors:
+    -------------------
     Optional keywords arguments must be of the form
         allow_xxxx=True/False
     or
@@ -2124,22 +2487,35 @@ def decode( txt, strict=False, encoding=None, **kw ):
     allowed.  If strict=False then prevent_comments=True will allow
     everything except comments.
     
+    Callback hooks:
+    ---------------
+    You may supply callback hooks by using the hook name as the
+    named argument, such as:
+        decode_float=decimal.Decimal
+
+    See the hooks documentation on the JSON.set_hook() method.
+
     """
     # Initialize the JSON object
     j = JSON( strict=strict )
     for keyword, value in kw.items():
-        if keyword.startswith('allow_'):
+        behavior = None
+        hook = None
+        if keyword in j.all_hook_names:
+            j.set_hook( keyword, value )
+        elif keyword.startswith('allow_'):
             behavior = keyword[6:]
             allow = bool(value)
         elif keyword.startswith('prevent_'):
             behavior = keyword[8:]
             allow = not bool(value)
         else:
-            raise ValueError('unknown keyword argument', keyword)
-        if allow:
-            j.allow(behavior)
-        else:
-            j.prevent(behavior)
+            raise TypeError("%s.%s(): Unknown keyword argument %r" % (__name__,'decode',keyword))
+        if behavior:
+            if allow:
+                j.allow(behavior)
+            else:
+                j.prevent(behavior)
 
     # Convert the input string into unicode if needed.
     if isinstance(txt,unicode):
