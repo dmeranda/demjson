@@ -185,6 +185,14 @@ file "docs/CHANGES.txt" for a complete history of changes.
        - U+2029  PARAGRAPH SEPARATOR  (Category Zp)
        - U+E007F CANCEL TAG           (Category Cf)
 
+ Errors and warnings
+ -------------------
+
+ * Error types: The base error type 'JSONError' is now a subclass of
+   Python's standard 'Exception' class rather than 'ValueError'.  If
+   you had been using try...except blocks with ValueError then you
+   will need to change; preferably to catch JSONError.
+
  jsonlint command
  ----------------
 

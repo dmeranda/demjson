@@ -1126,7 +1126,7 @@ class JSONSkipHook(Exception):
     """
     pass
 
-class JSONError(ValueError):
+class JSONError(Exception):
     """Our base class for all JSON-related errors.
 
     """
