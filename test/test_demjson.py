@@ -11,6 +11,7 @@ import sys, os, time
 import unittest
 import string
 import unicodedata
+import codecs
 import collections
 import datetime
 
@@ -80,6 +81,84 @@ class LetterOrdDict(dict_mixin):
     def __iter__(self):
         for v in self._letters:
             yield v
+
+## ------------------------------
+
+class rot_one(codecs.CodecInfo):
+    """Dummy codec for ROT-1.
+
+    Rotate by 1 character.  A->B, B->C, ..., Z->A
+
+    """
+    @staticmethod
+    def lookup( name ):
+        if name.lower() in ('rot1','rot-1'):
+            return codecs.CodecInfo( rot_one.encode, rot_one.decode, name='rot-1' )
+        return None
+    @staticmethod
+    def encode( s ):
+        byte_list = []
+        for i, c in enumerate(s):
+            if 'A' <= c <= 'Y':
+                byte_list.append( ord(c)+1 )
+            elif c == 'Z':
+                byte_list.append( ord('A') )
+            elif ord(c) <= 0x7f:
+                byte_list.append( ord(c) )
+            else:
+                raise UnicodeEncodeError('rot-1',s,i,i,"Can not encode code point U+%04X"%ord(c))
+        return (rawbytes(byte_list), i+1)
+    @staticmethod
+    def decode( byte_list ):
+        if is_python3:
+            byte_values = byte_list
+        else:
+            byte_values = [ord(n) for n in byte_list]
+        chars = []
+        for i, b in enumerate(byte_values):
+            if ord('B') <= b <= ord('Z'):
+                chars.append( unichr(b-1) )
+            elif b == ord('A'):
+                chars.append( u'Z' )
+            elif b <= 0x7fL:
+                chars.append( unichr(b) )
+            else:
+                raise UnicodeDecodeError('rot-1',byte_list,i,i,"Can not decode byte value 0x%02x"%b)
+        return (u''.join(chars), i+1)
+
+## ------------------------------
+class no_curly_braces(codecs.CodecInfo):
+    """Degenerate codec that does not have curly braces.
+    """
+    @staticmethod
+    def lookup( name ):
+        if name.lower() in ('degenerate','degenerate'):
+            return codecs.CodecInfo( no_curly_braces.encode, no_curly_braces.decode, name='degenerate' )
+        return None
+    @staticmethod
+    def encode( s ):
+        byte_list = []
+        for i, c in enumerate(s):
+            if c=='{' or c=='}':
+                raise UnicodeEncodeError('degenerate',s,i,i,"Can not encode curly braces")
+            elif ord(c) <= 0x7f:
+                byte_list.append( ord(c) )
+            else:
+                raise UnicodeEncodeError('degenerate',s,i,i,"Can not encode code point U+%04X"%ord(c))
+        return (rawbytes(byte_list), i+1)
+    @staticmethod
+    def decode( byte_list ):
+        if is_python3:
+            byte_values = byte_list
+        else:
+            byte_values = [ord(n) for n in byte_list]
+        chars = []
+        for i, b in enumerate(byte_values):
+            if b > 0x7f or b == ord('{') or b == ord('}'):
+                raise UnicodeDecodeError('degenerate',byte_list,i,i,"Can not decode byte value 0x%02x"%b)
+            else:
+                chars.append( unichr(b) )
+        return (u''.join(chars), i+1)
 
 ## ------------------------------
 
@@ -264,7 +343,24 @@ class DemjsonTest(unittest.TestCase):
         self.assertEqual(demjson.encode(u'\u00e0', escape_unicode=True), r'"\u00e0"')
         self.assertEqual(demjson.encode(u'\u2012', escape_unicode=True), r'"\u2012"')
 
-    def testAutoDetectEncoding(self):
+
+    def testAutoDetectEncodingWithCustomUTF32(self):
+        old_use_custom = demjson.helpers.always_use_custom_codecs
+        try:
+            demjson.helpers.always_use_custom_codecs = True
+            self.runTestAutoDetectEncoding()
+        finally:
+            demjson.helpers.always_use_custom_codecs = old_use_custom
+
+    def testAutoDetectEncodingWithBuiltinUTF32(self):
+        old_use_custom = demjson.helpers.always_use_custom_codecs
+        try:
+            demjson.helpers.always_use_custom_codecs = False
+            self.runTestAutoDetectEncoding()
+        finally:
+            demjson.helpers.always_use_custom_codecs = old_use_custom
+
+    def runTestAutoDetectEncoding(self):
         QT = ord('"')
         TAB = ord('\t')
         FOUR = ord('4')
@@ -394,6 +490,92 @@ class DemjsonTest(unittest.TestCase):
                              rawbytes([ ord(c) for c in r'"\udbc8\udf45"' ]) )
             self.assertEqual(demjson.encode(u'\U0010ffff',encoding='ascii'),
                              rawbytes([ ord(c) for c in r'"\udbff\udfff"' ]) )
+
+    def have_codec(self, name):
+        import codecs
+        try:
+            i = codecs.lookup(name)
+        except LookupError:
+            return False
+        else:
+            return True
+
+    def testDecodeWithWindows1252(self):
+        have_cp1252 = self.have_codec('cp1252')
+        if have_cp1252:
+            # Use Windows-1252 code page. Note character 0x8c is U+0152, which
+            # is different than ISO8859-1.
+            d = rawbytes([ ord('"'), ord('a'), 0xe0, 0x8c, ord('"') ])
+            self.assertEqual(demjson.decode( d, encoding='cp1252' ),
+                             u"a\u00e0\u0152")
+
+    def testDecodeWithEBCDIC(self):
+        have_ebcdic = self.have_codec('ibm037')
+        if have_ebcdic:
+            # Try EBCDIC
+            d = rawbytes([ 0x7f, 0xc1, 0xc0, 0x7c, 0xe0, 0xa4, 0xf0, 0xf1, 0xf5, 0xf2, 0x7f ])
+            self.assertEqual(demjson.decode( d, encoding='ibm037' ),
+                             u"A{@\u0152")
+
+    def testDecodeWithISO8859_1(self):
+        have_iso8859_1 = self.have_codec('iso8859-1')
+        if have_iso8859_1:
+            # Try ISO-8859-1
+            d = rawbytes([ ord('"'), ord('a'), 0xe0, ord('\\'), ord('u'), ord('0'), ord('1'), ord('5'), ord('2'), ord('"') ])
+            self.assertEqual(demjson.decode( d, encoding='iso8859-1' ),
+                             u"a\u00e0\u0152")
+
+    def testDecodeWithCustomCodec(self):
+        # Try Rot-1
+        ci = rot_one.lookup('rot-1')
+        d = rawbytes([ ord('"'), ord('A'), ord('B'), ord('Y'), ord('Z'), ord(' '), ord('5'), ord('"') ])
+        self.assertEqual(demjson.decode( d, encoding=ci ),
+                         u"ZAXY 5")
+
+    def testDecodeWithDegenerateCodec(self):
+        ci = no_curly_braces.lookup('degenerate')
+
+        d = rawbytes([ord(c) for c in '"abc"' ])
+        self.assertEqual(demjson.decode( d, encoding=ci ),
+                         u"abc")
+
+        d = rawbytes([ord(c) for c in '{"abc":42}' ])
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, d, encoding=ci )
+
+    def testEncodeWithWindows1252(self):
+        have_cp1252 = self.have_codec('cp1252')
+        if have_cp1252:
+            s = u'a\u00e0\u0152'
+            self.assertEqual(demjson.encode( s, encoding='cp1252' ),
+                             rawbytes([ ord('"'), ord('a'), 0xe0, 0x8c, ord('"') ]) )
+
+    def testEncodeWithEBCDIC(self):
+        have_ebcdic = self.have_codec('ibm037')
+        if have_ebcdic:
+            s = u"A{@\u0152"
+            self.assertEqual(demjson.encode( s, encoding='ibm037' ),
+                             rawbytes([ 0x7f, 0xc1, 0xc0, 0x7c, 0xe0, 0xa4, 0xf0, 0xf1, 0xf5, 0xf2, 0x7f ]) )
+
+    def testEncodeWithISO8859_1(self):
+        have_iso8859_1 = self.have_codec('iso8859-1')
+        if have_iso8859_1:
+            s = u'a\u00e0\u0152'
+            self.assertEqual(demjson.encode( s, encoding='iso8859-1' ),
+                             rawbytes([ ord('"'), ord('a'), 0xe0, ord('\\'), ord('u'), ord('0'), ord('1'), ord('5'), ord('2'), ord('"') ]) )
+
+    def testEncodeWithCustomCodec(self):
+        # Try Rot-1
+        ci = rot_one.lookup('rot-1')
+        d = u"ABYZ 5"
+        self.assertEqual(demjson.encode( d, encoding=ci ),
+                         rawbytes([ ord('"'), ord('B'), ord('C'), ord('Z'), ord('A'), ord(' '), ord('5'), ord('"') ]) )
+
+    def testEncodeWithDegenerateCodec(self):
+        ci = no_curly_braces.lookup('degenerate')
+
+        self.assertRaises(demjson.JSONEncodeError, demjson.encode, u'"abc"', encoding=ci )
+        self.assertRaises(demjson.JSONEncodeError, demjson.encode, u'{"abc":42}', encoding=ci )
+
 
     def testDecodeArraySimple(self):
         self.assertEqual(demjson.decode('[]'), [])

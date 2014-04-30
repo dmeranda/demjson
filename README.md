@@ -53,6 +53,18 @@ What's new
 These are the changes from 1.6 to 1.7 (released 2014-04-13).  See the
 file "docs/CHANGES.txt" for a complete history of changes.
 
+ * Python 3: This version supports both Python 2 and Python 3, via the
+   2to3 conversion program.  When installing with setup.py or a PyPI
+   distribution mechanism such as pip or easy_install, this conversion
+   should automatically happen.
+
+   Note that the API under Python 3 will be slightly different.
+   Mainly new Python types are supported.  Also there will be some
+   cases in which byte array types are used or returned rather than
+   strings.
+
+   Read the file "docs/PYTHON3.txt" for complete information.
+
  * RFC 7159 conformance: The new RFC (published March 2014 and which
    superseded RFC 4627) relaxes the constraint that a JSON document
    must start with an object or array.  This also brings it into
@@ -60,20 +72,16 @@ file "docs/CHANGES.txt" for a complete history of changes.
 
    Now any JSON value type is a legal JSON document.
 
- * Python 3: This version supports both Python 2 and Python 3, via the
-   2to3 conversion program.  When installing via setup.py or a PyPI
-   distribution mechanism, this conversion should automatically
-   happen.
+ * Callback hooks: This version allows the user to provide a number
+   of different callback functions, or hooks, which can do special
+   processing.  For example when parsing JSON you could detect
+   strings that look like dates, and automatically convert them
+   into Python datetime objects instead.
 
-   Note that the API under Python 3 will be slightly different.
-   Mainly there will be some cases in which byte array types are used
-   or returned rather than strings.
-
-   Read the file "docs/PYTHON3.txt" for complete information.
+   Read the file "docs/HOOKS.txt" for complete information.
 
  * Subclassing: Subclassing the demjson.JSON class is now highly
-   discouraged as future changes may alter the method parameters or
-   names.
+   discouraged as future changes may alter the method parameters or names.
 
    In particular overriding the encode_default() method is now
    DEPRECATED!  It will continue work in this version, but will be
@@ -83,13 +91,14 @@ file "docs/CHANGES.txt" for a complete history of changes.
    achieve most needs that previously would have been done with
    subclassing.
 
- * Callback hooks: This version allows the user to provide a number
-   of different callback functions, or hooks, which can do special
-   processing.  For example when parsing JSON you could detect
-   strings that look like dates, and automatically convert them
-   into Python datetime objects instead.
+ Data type support
+ -----------------
 
-   Read the file "docs/HOOKS.txt" for complete information.
+ * Python 3 types: Many new types introduced with Python 3 are
+   directly supported, when running in a Python 3 environment.  This
+   includes 'bytes', 'bytearray', 'memoryview', and 'ChainMap'.
+
+   Read the file "docs/PYTHON3.txt" for complete information.
 
  * Named tuples: When encoding to JSON, all named tuples (objects of
    Python's standard 'collections.namedtuple' type) are now encoded
@@ -104,6 +113,7 @@ file "docs/CHANGES.txt" for a complete history of changes.
 
        demjson.encode( p )
             # gives =>    {"x":5, "y":8}
+
        demjson.encode( p, encode_namedtuple_as_object=False )
             # gives =>    [5, 8]
 ```
@@ -112,13 +122,50 @@ file "docs/CHANGES.txt" for a complete history of changes.
    namedtuple protocol, i.e., which are subclasses of 'tuple' and that
    have an "_asdict()" method.
 
-   Note that the order of keys is necessarily preserved, but instead
+   Note that the order of keys is not necessarily preserved, but instead
    will appear in the JSON output alphabetically.
 
- * Unicode errors: When reading JSON from raw bytes, if the input is
-   not correctly encoded with the given, or auto-detected, Unicode
-   encoding algorithm then a JSONDecodeError will now be raised rather
-   than a UnicodeDecodeError.
+ * Mutable strings: Support for the old Python mutable strings (the
+   UserDict.MutableString type) has been dropped.  That experimental
+   type had already been deprecated since Python 2.6 and removed
+   entirely from Python 3.  If you have code that passes a
+   MutableString to a JSON encoding function then either do not
+   upgrade to this release, or first convert such types to standard
+   strings before JSON encoding them.
+
+ Unicode and codec support
+ -------------------------
+
+ * Codecs: The 'encoding' argument to the decode() and encode()
+   functions will now accept a codec object as well as an encoding
+   name; i.e., any subclass of 'codecs.CodecInfo'.  All \u-escaping in
+   string literals will be automatically adjusted based on your custom
+   codec's repertoire of characters.
+
+ * UTF-32: The included functions for UTF-32/UCS-4 support (missing
+   from older versions of Python) are now presented as a full-blown
+   codec class: 'demjson.utf32'.  It is completely compatible with the
+   standard codecs module.
+
+   It is normally unregisted, but you may register it with the Python codecs system by:
+
+```python
+       import demjson, codecs
+       codecs.register( demjson.utf32.lookup )
+```
+
+ * Unicode errors: During reading or writing JSON as raw bytes (when
+   an encoding is specified), any Unicode errors are now wrapped in a
+   JSON error instead.
+
+       - UnicodeDecodeError is transformed into JSONDecodeError
+       - UnicodeEncodeError is transformed into JSONEncodeError
+
+   When running in Python 3 the standard Exception Chaining (PEP 3134)
+   mechanism is employed.  Under Python 2 exception chaining is
+   simulated, but a printed traceback of the original exception may
+   not be printed. You can get to the original exception in the
+   __cause__ member of the outer exception.
 
  * Unicode escapes: When outputting JSON certain additional characters
    in strings will now always be \u-escaped to increase compatibility
@@ -128,8 +175,8 @@ file "docs/CHANGES.txt" for a complete history of changes.
    ignore if it chooses per the ECMAscript standard).
 
    This essentially means that characters in any of the Unicode
-   categories of Cc, Cf, Zl, and Zp will be \u-escaped; which includes
-   for example:
+   categories of Cc, Cf, Zl, and Zp will always be \u-escaped; which
+   includes for example:
 
        - U+007F  DELETE               (Category Cc)
        - U+00AD  SOFT HYPHEN          (Category Cf)
@@ -138,13 +185,8 @@ file "docs/CHANGES.txt" for a complete history of changes.
        - U+2029  PARAGRAPH SEPARATOR  (Category Zp)
        - U+E007F CANCEL TAG           (Category Cf)
 
- * Mutable strings: Support for the old Python mutable strings (the
-   UserDict.MutableString type) has been dropped.  That experimental
-   type had already been deprecated since Python 2.6 and removed
-   entirely from Python 3.  If you have code that passes a
-   MutableString to a JSON encoding function then either do not
-   upgrade to this release, or first convert such types to standard
-   strings before JSON encoding them.
+ jsonlint command
+ ----------------
 
  * The "jsonlint" command script will now be installed by default.
 

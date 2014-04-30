@@ -45,6 +45,10 @@ DESCRIPTION
           floats, such as 1e+40.  Also integer -0 is converted to
           float -0, so as to preserve the sign (which ECMAScript requires).
     
+       -- Note 3. numbers requiring more significant digits than can be
+          represented by the Python float type will be converted into a
+          Python Decimal type, from the standard 'decimal' module.
+    
     In addition, when operating in non-strict mode, several IEEE 754
     non-numbers are also handled, and are mapped to specific Python
     objects declared in this module:
@@ -118,7 +122,10 @@ DESCRIPTION
 CLASSES
     __builtin__.object
         JSON
+        helpers
         jsonlint
+    codecs.CodecInfo(__builtin__.tuple)
+        utf32
     exceptions.Exception(exceptions.BaseException)
         JSONSkipHook
     exceptions.ValueError(exceptions.StandardError)
@@ -441,21 +448,6 @@ CLASSES
      |      If skip_comments is True and not running in strict JSON mode, then
      |      comments will be skipped over just like whitespace.
      |  
-     |  strip_format_control_chars(self, txt)
-     |      Filters out all Unicode format control characters from the string.
-     |      
-     |      ECMAScript permits any Unicode "format control characters" to
-     |      appear at any place in the source code.  They are to be
-     |      ignored as if they are not there before any other lexical
-     |      tokenization occurs.  Note that JSON does not allow them.
-     |      
-     |      Ref. ECMAScript section 7.1.
-     |      
-     |      There are dozens of Format Control Characters, for example:
-     |          U+00AD   SOFT HYPHEN
-     |          U+200B   ZERO WIDTH SPACE
-     |          U+2060   WORD JOINER
-     |  
      |  try_encode_default(self, obj, nest_level=0)
      |  
      |  ----------------------------------------------------------------------
@@ -483,6 +475,8 @@ CLASSES
      |  Data and other attributes defined here:
      |  
      |  all_hook_names = ('decode_number', 'decode_float', 'decode_object', 'd...
+     |  
+     |  json_syntax_characters = u'{}[]"\\,:0123456789.-+abcdefghijklmnopqrstu...
     
     class JSONDecodeError(JSONError)
      |  An exception class raised when a JSON decoding error (syntax error) occurs.
@@ -931,6 +925,131 @@ CLASSES
      |  
      |  message
     
+    class helpers(__builtin__.object)
+     |  A set of utility functions.
+     |  
+     |  Static methods defined here:
+     |  
+     |  auto_detect_encoding(s)
+     |      Takes a string (or byte array) and tries to determine the Unicode encoding it is in.
+     |      
+     |      Returns the encoding name, as a string.
+     |  
+     |  auto_unicode_decode(s)
+     |      Takes a string (or byte array) and tries to convert it to a Unicode string.
+     |      
+     |      This will return a Python unicode string type corresponding to the
+     |      input string (either str or unicode).  The character encoding is
+     |      guessed by looking for either a Unicode BOM prefix, or by the
+     |      rules specified by RFC 7158.  When in doubt it is assumed the
+     |      input is encoded in UTF-8 (the default for JSON).
+     |      
+     |      The BOM (byte order mark) if present will be stripped off of the
+     |      returned string.
+     |  
+     |  char_is_identifier_leader(c)
+     |      Determines if the character may be the first character of a
+     |      JavaScript identifier.
+     |  
+     |  char_is_identifier_tail(c)
+     |      Determines if the character may be part of a JavaScript
+     |      identifier.
+     |  
+     |  char_is_json_eol(c)
+     |      Determines if the given character is a JSON line separator
+     |  
+     |  char_is_json_ws(c)
+     |      Determines if the given character is a JSON white-space character
+     |  
+     |  char_is_unicode_eol(c)
+     |      Determines if the given character is a Unicode line or
+     |      paragraph separator. These correspond to CR and LF as well as
+     |      Unicode characters in the Zl or Zp categories.
+     |  
+     |  char_is_unicode_ws(c)
+     |      Determines if the given character is a Unicode space character
+     |  
+     |  decode_hex(hexstring)
+     |      Decodes a hexadecimal string into it's integer value.
+     |  
+     |  decode_octal(octalstring)
+     |      Decodes an octal string into it's integer value.
+     |  
+     |  extend_and_flatten_list_with_sep(orig_seq, extension_seq, separator='')
+     |  
+     |  is_hex_digit(c)
+     |      Determines if the given character is a valid hexadecimal digit (0-9, a-f, A-F).
+     |  
+     |  is_octal_digit(c)
+     |      Determines if the given character is a valid octal digit (0-7).
+     |  
+     |  isnumbertype(obj)
+     |      Is the object of a Python number type (excluding complex)?
+     |  
+     |  isstringtype(obj)
+     |      Is the object of a Python string type?
+     |  
+     |  lookup_codec(encoding)
+     |      Wrapper around codecs.lookup().
+     |      
+     |      Returns None if codec not found, rather than raising a LookupError.
+     |  
+     |  make_raw_bytes(byte_list)
+     |      Constructs a byte array (bytes in Python 3, str in Python 2) from a list of byte values (0-255).
+     |  
+     |  strip_format_control_chars(txt)
+     |      Filters out all Unicode format control characters from the string.
+     |      
+     |      ECMAScript permits any Unicode "format control characters" to
+     |      appear at any place in the source code.  They are to be
+     |      ignored as if they are not there before any other lexical
+     |      tokenization occurs.  Note that JSON does not allow them,
+     |      except within string literals.
+     |      
+     |      * Ref. ECMAScript section 7.1.
+     |      * http://en.wikipedia.org/wiki/Unicode_control_characters
+     |      
+     |      There are dozens of Format Control Characters, for example:
+     |          U+00AD   SOFT HYPHEN
+     |          U+200B   ZERO WIDTH SPACE
+     |          U+2060   WORD JOINER
+     |  
+     |  surrogate_pair_as_unicode(c1, c2)
+     |      Takes a pair of unicode surrogates and returns the equivalent unicode character.
+     |      
+     |      The input pair must be a surrogate pair, with c1 in the range
+     |      U+D800 to U+DBFF and c2 in the range U+DC00 to U+DFFF.
+     |  
+     |  unicode_as_surrogate_pair(c)
+     |      Takes a single unicode character and returns a sequence of surrogate pairs.
+     |      
+     |      The output of this function is a tuple consisting of one or two unicode
+     |      characters, such that if the input character is outside the BMP range
+     |      then the output is a two-character surrogate pair representing that character.
+     |      
+     |      If the input character is inside the BMP then the output tuple will have
+     |      just a single character...the same one.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |  
+     |  always_use_custom_codecs = False
+     |  
+     |  hexdigits = '0123456789ABCDEFabcdef'
+     |  
+     |  octaldigits = '01234567'
+     |  
+     |  unsafe_string_chars = u'\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\x...
+    
     class jsonlint(__builtin__.object)
      |  This class contains most of the logic for the "jsonlint" command.
      |  
@@ -979,20 +1098,167 @@ CLASSES
      |  
      |  usage
      |      A mutlti-line string containing the program usage instructions.
+    
+    class utf32(codecs.CodecInfo)
+     |  Unicode UTF-32 and UCS4 encoding/decoding support.
+     |  
+     |  This is for older Pythons whch did not have UTF-32 codecs.
+     |  
+     |  JSON requires that all JSON implementations must support the
+     |  UTF-32 encoding (as well as UTF-8 and UTF-16).  But earlier
+     |  versions of Python did not provide a UTF-32 codec, so we must
+     |  implement UTF-32 ourselves in case we need it.
+     |  
+     |  See http://en.wikipedia.org/wiki/UTF-32
+     |  
+     |  Method resolution order:
+     |      utf32
+     |      codecs.CodecInfo
+     |      __builtin__.tuple
+     |      __builtin__.object
+     |  
+     |  Static methods defined here:
+     |  
+     |  decode(obj, errors='strict', endianness=None)
+     |      Decodes a UTF-32 byte string into a Unicode string.
+     |      
+     |      Returns tuple (bytearray, num_bytes)
+     |      
+     |      The errors argument shold be one of 'strict', 'ignore',
+     |      'replace', 'backslashreplace', or 'xmlcharrefreplace'.
+     |      
+     |      The endianness should either be None (for auto-guessing), or a
+     |      word that starts with 'B' (big) or 'L' (little).
+     |      
+     |      Will detect a Byte-Order Mark. If a BOM is found and endianness
+     |      is also set, then the two must match.
+     |      
+     |      If neither a BOM is found nor endianness is set, then big
+     |      endian order is assumed.
+     |  
+     |  encode(obj, errors='strict', endianness=None, include_bom=True)
+     |      Encodes a Unicode string into a UTF-32 encoded byte string.
+     |      
+     |      Returns a tuple: (bytearry, num_chars)
+     |      
+     |      The errors argument should be one of 'strict', 'ignore', or 'replace'.
+     |      
+     |      The endianness should be one of:
+     |          * 'B', '>', or 'big'     -- Big endian
+     |          * 'L', '<', or 'little'  -- Little endien
+     |          * None                   -- Default, from sys.byteorder
+     |      
+     |      If include_bom is true a Byte-Order Mark will be written to
+     |      the beginning of the string, otherwise it will be omitted.
+     |  
+     |  lookup(name)
+     |      A standard Python codec lookup function for UCS4/UTF32.
+     |      
+     |      If if recognizes an encoding name it returns a CodecInfo
+     |      structure which contains the various encode and decoder
+     |      functions to use.
+     |  
+     |  utf32be_decode(obj, errors='strict')
+     |      Decodes a UTF-32BE (big endian) byte string into a Unicode string.
+     |  
+     |  utf32be_encode(obj, errors='strict', include_bom=False)
+     |      Encodes a Unicode string into a UTF-32BE (big endian) encoded byte string.
+     |  
+     |  utf32le_decode(obj, errors='strict')
+     |      Decodes a UTF-32LE (little endian) byte string into a Unicode string.
+     |  
+     |  utf32le_encode(obj, errors='strict', include_bom=False)
+     |      Encodes a Unicode string into a UTF-32LE (little endian) encoded byte string.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |  
+     |  BOM_UTF32_BE = '\x00\x00\xfe\xff'
+     |  
+     |  BOM_UTF32_LE = '\xff\xfe\x00\x00'
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from codecs.CodecInfo:
+     |  
+     |  __repr__(self)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Static methods inherited from codecs.CodecInfo:
+     |  
+     |  __new__(cls, encode, decode, streamreader=None, streamwriter=None, incrementalencoder=None, incrementaldecoder=None, name=None)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from codecs.CodecInfo:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from __builtin__.tuple:
+     |  
+     |  __add__(...)
+     |      x.__add__(y) <==> x+y
+     |  
+     |  __contains__(...)
+     |      x.__contains__(y) <==> y in x
+     |  
+     |  __eq__(...)
+     |      x.__eq__(y) <==> x==y
+     |  
+     |  __ge__(...)
+     |      x.__ge__(y) <==> x>=y
+     |  
+     |  __getattribute__(...)
+     |      x.__getattribute__('name') <==> x.name
+     |  
+     |  __getitem__(...)
+     |      x.__getitem__(y) <==> x[y]
+     |  
+     |  __getnewargs__(...)
+     |  
+     |  __getslice__(...)
+     |      x.__getslice__(i, j) <==> x[i:j]
+     |      
+     |      Use of negative indices is not supported.
+     |  
+     |  __gt__(...)
+     |      x.__gt__(y) <==> x>y
+     |  
+     |  __hash__(...)
+     |      x.__hash__() <==> hash(x)
+     |  
+     |  __iter__(...)
+     |      x.__iter__() <==> iter(x)
+     |  
+     |  __le__(...)
+     |      x.__le__(y) <==> x<=y
+     |  
+     |  __len__(...)
+     |      x.__len__() <==> len(x)
+     |  
+     |  __lt__(...)
+     |      x.__lt__(y) <==> x<y
+     |  
+     |  __mul__(...)
+     |      x.__mul__(n) <==> x*n
+     |  
+     |  __ne__(...)
+     |      x.__ne__(y) <==> x!=y
+     |  
+     |  __rmul__(...)
+     |      x.__rmul__(n) <==> n*x
+     |  
+     |  __sizeof__(...)
+     |      T.__sizeof__() -- size of T in memory, in bytes
+     |  
+     |  count(...)
+     |      T.count(value) -> integer -- return number of occurrences of value
+     |  
+     |  index(...)
+     |      T.index(value, [start, [stop]]) -> integer -- return first index of value.
+     |      Raises ValueError if the value is not present.
 
 FUNCTIONS
-    auto_unicode_decode(s)
-        Takes a string (or byte array) and tries to convert it to a Unicode string.
-        
-        This will return a Python unicode string type corresponding to the
-        input string (either str or unicode).  The character encoding is
-        guessed by looking for either a Unicode BOM prefix, or by the
-        rules specified by RFC 7158.  When in doubt it is assumed the
-        input is encoded in UTF-8 (the default for JSON).
-        
-        The BOM (byte order mark) if present will be stripped off of the
-        returned string.
-    
     decode(txt, strict=False, encoding=None, **kw)
         Decodes a JSON-encoded string into a Python object.
         
@@ -1043,12 +1309,6 @@ FUNCTIONS
         
         See the hooks documentation on the JSON.set_hook() method.
     
-    decode_hex(hexstring)
-        Decodes a hexadecimal string into it's integer value.
-    
-    decode_octal(octalstring)
-        Decodes an octal string into it's integer value.
-    
     determine_float_precision()
         Returns a tuple (significant_digits, max_exponent) for the float type.
     
@@ -1065,66 +1325,47 @@ FUNCTIONS
         string will be "pretty printed" with whitespace and indentation
         added to make it more readable.
         
-        If 'escape_unicode' is set to True, then all non-ASCII characters
-        will be represented as a unicode escape sequence; if False then
-        the actual real unicode character will be inserted.
-        
-        If no encoding is specified (encoding=None) then the output will
-        either be a Python string (if entirely ASCII) or a Python unicode
-        string type.
-        
-        However if an encoding name is given then the returned value will
-        be a python string which is the byte sequence encoding the JSON
-        value.  As the default/recommended encoding for JSON is UTF-8,
-        you should almost always pass in encoding='utf8'.
-        
         If 'encode_namedtuple_as_object' is True, then objects of type
         namedtuple, or subclasses of 'tuple' that have an _asdict()
         method, will be encoded as an object rather than an array.
+        
+        CONCERNING CHARACTER ENCODING:
+        
+        The 'encoding' argument should be one of:
+        
+            * None - The return will be a Unicode string.
+            * encoding_name - A string which is the name of a known
+                  encoding, such as 'UTF-8' or 'ascii'.
+            * codec - A CodecInfo object, such as as found by codecs.lookup().
+                  This allows you to use a custom codec as well as those
+                  built into Python.
+        
+        If an encoding is given (either by name or by codec), then the
+        returned value will be a byte array (Python 3), or a 'str' string
+        (Python 2); which represents the raw set of bytes.  Otherwise,
+        if encoding is None, then the returned value will be a Unicode
+        string.
+        
+        The 'escape_unicode' argument is used to determine which characters
+        in string literals must be \u escaped.  Should be one of:
+        
+            * True  -- All non-ASCII characters are always \u escaped.
+            * False -- Try to insert actual Unicode characters if possible.
+            * function -- A user-supplied function that accepts a single
+                 unicode character and returns True or False; where True
+                 means to \u escape that character.
+        
+        Regardless of escape_unicode, certain characters will always be
+        \u escaped. Additionaly any characters not in the output encoding
+        repertoire for the encoding codec will be \u escaped as well.
     
     extend_and_flatten_list_with_sep(orig_seq, extension_seq, separator='')
     
     extend_list_with_sep(orig_seq, extension_seq, sepchar='')
     
-    isnumbertype(obj)
-        Is the object of a Python number type (excluding complex)?
-    
-    isstringtype(obj)
-        Is the object of a Python string type?
-    
     skipstringsafe(s, start=0, end=None)
     
     skipstringsafe_slow(s, start=0, end=None)
-    
-    surrogate_pair_as_unicode(c1, c2)
-        Takes a pair of unicode surrogates and returns the equivalent unicode character.
-        
-        The input pair must be a surrogate pair, with c1 in the range
-        U+D800 to U+DBFF and c2 in the range U+DC00 to U+DFFF.
-    
-    unicode_as_surrogate_pair(c)
-        Takes a single unicode character and returns a sequence of surrogate pairs.
-        
-        The output of this function is a tuple consisting of one or two unicode
-        characters, such that if the input character is outside the BMP range
-        then the output is a two-character surrogate pair representing that character.
-        
-        If the input character is inside the BMP then the output tuple will have
-        just a single character...the same one.
-    
-    utf32_decode(obj, errors='strict', endian='LE')
-        Decodes a UTF-32LE byte string into a Unicode string.
-    
-    utf32_encode(obj, errors='strict', endian='LE')
-        Encodes a Unicode string into a UTF-32 encoded byte string.
-    
-    utf32be_decode(obj, errors='strict')
-    
-    utf32be_encode(obj, errors='strict')
-    
-    utf32le_decode(obj, errors='strict')
-    
-    utf32le_encode(obj, errors='strict')
 
 DATA
     __author__ = 'Deron Meranda <http://deron.meranda.us/>'
@@ -1136,13 +1377,10 @@ DATA
     file_ext = 'json'
     float_maxexp = 307
     float_sigdigits = 14
-    hexdigits = '0123456789ABCDEFabcdef'
     inf = inf
     nan = nan
     neginf = -inf
-    octaldigits = '01234567'
     undefined = demjson.undefined
-    unsafe_string_chars = u'\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\x...
 
 VERSION
     1.7

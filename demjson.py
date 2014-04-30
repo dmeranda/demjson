@@ -41,6 +41,10 @@ r""" A JSON data encoder and decoder.
        floats, such as 1e+40.  Also integer -0 is converted to
        float -0, so as to preserve the sign (which ECMAScript requires).
 
+    -- Note 3. numbers requiring more significant digits than can be
+       represented by the Python float type will be converted into a
+       Python Decimal type, from the standard 'decimal' module.
+
  In addition, when operating in non-strict mode, several IEEE 754
  non-numbers are also handled, and are mapped to specific Python
  objects declared in this module:
@@ -143,8 +147,6 @@ or <http://www.fsf.org/licensing/>.
 
 content_type = 'application/json'
 file_ext = 'json'
-hexdigits = '0123456789ABCDEFabcdef'
-octaldigits = '01234567'
 
 # ----------------------------------------------------------------------
 # Decimal and float types.
@@ -491,28 +493,18 @@ del _nonnumber_float_constants
 # ----------------------------------------------------------------------
 # String processing helpers
 
-def _make_unsafe_string_chars():
-    import unicodedata
-    unsafe = []
-    for c in [unichr(i) for i in range(0x100)]:
-        if c == u'"' or c == u'\\' \
-                or unicodedata.category( c ) in ['Cc','Cf','Zl','Zp']:
-            unsafe.append( c )
-    return u''.join( unsafe )
-unsafe_string_chars = _make_unsafe_string_chars()
-del _make_unsafe_string_chars
-
-
 def skipstringsafe( s, start=0, end=None ):
     i = start
     #if end is None:
     #    end = len(s)
-    while i < end and s[i] not in unsafe_string_chars:
+    unsafe = helpers.unsafe_string_chars
+    while i < end and s[i] not in unsafe:
         #c = s[i]
         #if c in unsafe_string_chars:
         #    break
         i += 1
     return i
+
 def skipstringsafe_slow( s, start=0, end=None ):
     i = start
     if end is None:
@@ -540,292 +532,587 @@ def extend_and_flatten_list_with_sep( orig_seq, extension_seq, separator='' ):
         orig_seq.extend( part )
 
 
+
 # ----------------------------------------------------------------------
-# Unicode helpers
-#
-# JSON requires that all JSON implementations must support the UTF-32
-# encoding (as well as UTF-8 and UTF-16).  But earlier versions of
-# Python did not provide a UTF-32 codec.  So we must implement UTF-32
-# ourselves in case we need it.
+# Unicode UTF-32
+# ----------------------------------------------------------------------
 
-def utf32_encode( obj, errors='strict', endian='LE' ):
-    """Encodes a Unicode string into a UTF-32 encoded byte string."""
-    import sys, struct
-    pack = struct.pack
-    if endian.upper() in ['LE','LITTLE']:
-        packlong = '<L'
-    elif endian.upper() in ['BE','BIG']:
-        packlong = '>L'
-    else:
-        raise ValueError("Expected endian to be one of \"LE\" or \"BE\".", endian)
-
+def _make_raw_bytes( byte_list ):
+    """Takes a list of byte values (numbers) and returns a bytes (Python 3) or string (Python 2)
+    """
+    import sys
     if sys.version_info.major >= 3:
-        # Python 3
-        f = bytearray()
-        write = f.extend
+        b = bytes( byte_list )
     else:
-        # Python 2
-        try:
-            import cStringIO as sio
-        except ImportError:
-            import StringIO as sio
-        f = sio.StringIO()
-        write = f.write
+        b = ''.join(chr(n) for n in byte_list)
+    return b
 
-    for c in obj:
+import codecs
+
+class utf32(codecs.CodecInfo):
+    """Unicode UTF-32 and UCS4 encoding/decoding support.
+
+    This is for older Pythons whch did not have UTF-32 codecs.
+
+    JSON requires that all JSON implementations must support the
+    UTF-32 encoding (as well as UTF-8 and UTF-16).  But earlier
+    versions of Python did not provide a UTF-32 codec, so we must
+    implement UTF-32 ourselves in case we need it.
+
+    See http://en.wikipedia.org/wiki/UTF-32
+
+    """
+    BOM_UTF32_BE = _make_raw_bytes([ 0, 0, 0xFE, 0xFF ])  #'\x00\x00\xfe\xff'
+    BOM_UTF32_LE = _make_raw_bytes([ 0xFF, 0xFE, 0, 0 ])  #'\xff\xfe\x00\x00'
+
+    @staticmethod
+    def lookup( name ):
+        """A standard Python codec lookup function for UCS4/UTF32.
+
+        If if recognizes an encoding name it returns a CodecInfo
+        structure which contains the various encode and decoder
+        functions to use.
+
+        """
+        ci = None
+        name = name.upper()
+        if name in ('UCS4BE','UCS-4BE','UCS-4-BE','UTF32BE','UTF-32BE','UTF-32-BE'):
+            ci = codecs.CodecInfo( utf32.utf32be_encode, utf32.utf32be_decode, name='utf-32be')
+        elif name in ('UCS4LE','UCS-4LE','UCS-4-LE','UTF32LE','UTF-32LE','UTF-32-LE'):
+            ci = codecs.CodecInfo( utf32.utf32le_encode, utf32.utf32le_decode, name='utf-32le')
+        elif name in ('UCS4','UCS-4','UTF32','UTF-32'):
+            ci = codecs.CodecInfo( utf32.encode, utf32.decode, name='utf-32')
+        return ci
+
+    @staticmethod
+    def encode( obj, errors='strict', endianness=None, include_bom=True ):
+        """Encodes a Unicode string into a UTF-32 encoded byte string.
+
+        Returns a tuple: (bytearry, num_chars)
+
+        The errors argument should be one of 'strict', 'ignore', or 'replace'.
+
+        The endianness should be one of:
+            * 'B', '>', or 'big'     -- Big endian
+            * 'L', '<', or 'little'  -- Little endien
+            * None                   -- Default, from sys.byteorder
+
+        If include_bom is true a Byte-Order Mark will be written to
+        the beginning of the string, otherwise it will be omitted.
+
+        """
+        import sys, struct
+
+        # Make a container that can store bytes
+        if sys.version_info.major >= 3:
+            f = bytearray()
+            write = f.extend
+            def tobytes():
+                return bytes(f)
+        else:
+            try:
+                import cStringIO as sio
+            except ImportError:
+                import StringIO as sio
+            f = sio.StringIO()
+            write = f.write
+            tobytes = f.getvalue
+
+        if not endianness:
+            endianness = sys.byteorder
+
+        if endianness.upper()[0] in ('B>'):
+            big_endian = True
+        elif endianness.upper()[0] in ('L<'):
+            big_endian = False
+        else:
+            raise ValueError("Invalid endianness %r: expected 'big', 'little', or None" % endianness)
+
+        pack = struct.pack
+        packspec = '>L' if big_endian else '<L'
+
+        num_chars = 0
+
+        if include_bom:
+            if big_endian:
+                write( utf32.BOM_UTF32_BE )
+            else:
+                write( utf32.BOM_UTF32_LE )
+            num_chars += 1
+
+        for pos, c in enumerate(obj):
+            n = ord(c)
+            if 0xD800 <= n <= 0xDFFF: # surrogate codepoints are prohibited by UTF-32
+                if errors == 'ignore':
+                    pass
+                elif errors == 'replace':
+                    n = 0xFFFD
+                else:
+                    raise UnicodeEncodeError('utf32',obj,pos,pos+1,"surrogate code points from U+D800 to U+DFFF are not allowed")
+            write( pack( packspec, n) )
+            num_chars += 1
+
+        return (tobytes(), num_chars)
+        
+    @staticmethod
+    def utf32le_encode( obj, errors='strict', include_bom=False ):
+        """Encodes a Unicode string into a UTF-32LE (little endian) encoded byte string."""
+        return utf32.encode( obj, errors=errors, endianness='L', include_bom=include_bom )
+
+    @staticmethod
+    def utf32be_encode( obj, errors='strict', include_bom=False ):
+        """Encodes a Unicode string into a UTF-32BE (big endian) encoded byte string."""
+        return utf32.encode( obj, errors=errors, endianness='B', include_bom=include_bom )
+
+    @staticmethod
+    def decode( obj, errors='strict', endianness=None ):
+        """Decodes a UTF-32 byte string into a Unicode string.
+
+        Returns tuple (bytearray, num_bytes)
+
+        The errors argument shold be one of 'strict', 'ignore',
+        'replace', 'backslashreplace', or 'xmlcharrefreplace'.
+
+        The endianness should either be None (for auto-guessing), or a
+        word that starts with 'B' (big) or 'L' (little).
+
+        Will detect a Byte-Order Mark. If a BOM is found and endianness
+        is also set, then the two must match.
+
+        If neither a BOM is found nor endianness is set, then big
+        endian order is assumed.
+
+        """
+        import struct, sys
+        maxunicode = sys.maxunicode
+        unpack = struct.unpack
+
+        # Detect BOM
+        if obj.startswith( utf32.BOM_UTF32_BE ):
+            bom_endianness = 'B'
+            start = len(utf32.BOM_UTF32_BE)
+        elif obj.startswith( utf32.BOM_UTF32_LE ):
+            bom_endianness = 'L'
+            start = len(utf32.BOM_UTF32_LE)
+        else:
+            bom_endianness = None
+            start = 0
+
+        num_bytes = start
+
+        if endianness == None:
+            if bom_endianness == None:
+                endianness = sys.byteorder.upper()[0]   # Assume platform default
+            else:
+                endianness = bom_endianness
+        else:
+            endianness = endianness[0].upper()
+            if bom_endianness and endianness != bom_endianness:
+                raise UnicodeDecodeError('utf32',obj,0,start,'BOM does not match expected byte order')
+
+        # Check for truncated last character
+        if ((len(obj)-start) % 4) != 0:
+            raise UnicodeDecodeError('utf32',obj,start,len(obj),
+                                     'Data length not a multiple of 4 bytes')
+
+        # Start decoding characters
+        chars = []
+        packspec = '>L' if endianness=='B' else '<L'
+        i = 0
+        for i in range(start, len(obj), 4):
+            seq = obj[i:i+4]
+            n = unpack( packspec, seq )[0]
+            num_bytes += 4
+
+            if n > maxunicode or (0xD800 <= n <= 0xDFFF):
+                if errors == 'strict':
+                    raise UnicodeDecodeError('utf32',obj,i,i+4,'Invalid code point U+%04X' % n)
+                elif errors == 'replace':
+                    chars.append( unichr(0xFFFD) )
+                elif errors == 'backslashreplace':
+                    if n > 0xffff:
+                        esc = "\\u%04x" % (n,)
+                    else:
+                        esc = "\\U%08x" % (n,)
+                    for esc_c in esc:
+                        chars.append( esc_c )
+                elif errors == 'xmlcharrefreplace':
+                    esc = "&#%d;" % (n,)
+                    for esc_c in esc:
+                        chars.append( esc_c )
+                else: # ignore
+                    pass
+            else:
+                chars.append( unichr(n) )
+        return (u''.join( chars ), num_bytes)
+
+    @staticmethod
+    def utf32le_decode( obj, errors='strict' ):
+        """Decodes a UTF-32LE (little endian) byte string into a Unicode string."""
+        return utf32.decode( obj, errors=errors, endianness='L' )
+
+    @staticmethod
+    def utf32be_decode( obj, errors='strict' ):
+        """Decodes a UTF-32BE (big endian) byte string into a Unicode string."""
+        return utf32.decode( obj, errors=errors, endianness='B' )
+
+
+# ----------------------------------------------------------------------
+# Helper functions
+# ----------------------------------------------------------------------
+
+def _make_unsafe_string_chars():
+    import unicodedata
+    unsafe = []
+    for c in [unichr(i) for i in range(0x100)]:
+        if c == u'"' or c == u'\\' \
+                or unicodedata.category( c ) in ['Cc','Cf','Zl','Zp']:
+            unsafe.append( c )
+    return u''.join( unsafe )
+
+class helpers(object):
+    """A set of utility functions."""
+
+    hexdigits = '0123456789ABCDEFabcdef'
+    octaldigits = '01234567'
+    unsafe_string_chars = _make_unsafe_string_chars()
+
+    always_use_custom_codecs = False   # If True use demjson's codecs
+                                       # before system codecs. This
+                                       # is mainly here for testing.
+
+    @staticmethod
+    def make_raw_bytes( byte_list ):
+        """Constructs a byte array (bytes in Python 3, str in Python 2) from a list of byte values (0-255).
+
+        """
+        return _make_raw_bytes( byte_list )
+
+    @staticmethod
+    def is_hex_digit( c ):
+        """Determines if the given character is a valid hexadecimal digit (0-9, a-f, A-F)."""
+        return (c in helpers.hexdigits)
+
+    @staticmethod
+    def is_octal_digit( c ):
+        """Determines if the given character is a valid octal digit (0-7)."""
+        return (c in helpers.octaldigits)
+
+    @staticmethod
+    def char_is_json_ws( c ):
+        """Determines if the given character is a JSON white-space character"""
+        return c in ' \t\n\r'
+
+    @staticmethod
+    def char_is_unicode_ws( c ):
+        """Determines if the given character is a Unicode space character"""
+        if not isinstance(c,unicode):
+            c = unicode(c)
+        if c in u' \t\n\r\f\v':
+            return True
+        import unicodedata
+        return unicodedata.category(c) == 'Zs'
+
+    @staticmethod
+    def char_is_json_eol( c ):
+        """Determines if the given character is a JSON line separator"""
+        return c in '\n\r'
+
+    @staticmethod
+    def char_is_unicode_eol( c ):
+        """Determines if the given character is a Unicode line or
+        paragraph separator. These correspond to CR and LF as well as
+        Unicode characters in the Zl or Zp categories.
+
+        """
+        return c in u'\r\n\u2028\u2029'
+
+    @staticmethod
+    def char_is_identifier_leader( c ):
+        """Determines if the character may be the first character of a
+        JavaScript identifier.
+        """
+        return c.isalpha() or c in '_$'
+
+    @staticmethod
+    def char_is_identifier_tail( c ):
+        """Determines if the character may be part of a JavaScript
+        identifier.
+        """
+        return c.isalnum() or c in u'_$\u200c\u200d'
+
+    @staticmethod
+    def extend_and_flatten_list_with_sep( orig_seq, extension_seq, separator='' ):
+        for i, part in enumerate(extension_seq):
+            if i > 0 and separator:
+                orig_seq.append( separator )
+            orig_seq.extend( part )
+
+    @staticmethod
+    def strip_format_control_chars( txt ):
+        """Filters out all Unicode format control characters from the string.
+
+        ECMAScript permits any Unicode "format control characters" to
+        appear at any place in the source code.  They are to be
+        ignored as if they are not there before any other lexical
+        tokenization occurs.  Note that JSON does not allow them,
+        except within string literals.
+
+        * Ref. ECMAScript section 7.1.
+        * http://en.wikipedia.org/wiki/Unicode_control_characters
+
+        There are dozens of Format Control Characters, for example:
+            U+00AD   SOFT HYPHEN
+            U+200B   ZERO WIDTH SPACE
+            U+2060   WORD JOINER
+
+        """
+        import unicodedata
+        txt2 = filter( lambda c: unicodedata.category(unicode(c)) != 'Cf', txt )
+
+        # 2to3 NOTE: The following is needed to work around a broken
+        # Python3 conversion in which filter() will be transformed
+        # into a list rather than a string.
+        if not isinstance(txt2,basestring):
+            txt2 = u''.join(txt2)
+        return txt2
+
+    @staticmethod
+    def lookup_codec( encoding ):
+        """Wrapper around codecs.lookup().
+
+        Returns None if codec not found, rather than raising a LookupError.
+        """
+        encoding = encoding.lower()
+        import codecs
+        if helpers.always_use_custom_codecs:
+            # Try custom utf32 first, then standard python codecs
+            cdk = utf32.lookup(encoding)
+            if not cdk:
+                try:
+                    cdk = codecs.lookup( encoding )
+                except LookupError:
+                    cdk = None
+        else:
+            # Try standard python codecs first, then custom utf32
+            try:
+                cdk = codecs.lookup( encoding )
+            except LookupError:
+                cdk = utf32.lookup( encoding )
+        return cdk
+
+    @staticmethod
+    def auto_detect_encoding( s ):
+        """Takes a string (or byte array) and tries to determine the Unicode encoding it is in.
+
+        Returns the encoding name, as a string.
+
+        """
+        if not s:
+            return "utf-8"
+
+        if len(s) == 0:
+            return ''.decode('utf8')
+
+        # Get the byte values of up to the first 4 bytes
+        ords = []
+        for i in range(0, min(len(s),4)):
+            x = s[i]
+            if isinstance(x, basestring):
+                x = ord(x)
+            ords.append( x )
+
+        # Look for BOM marker
+        import sys, codecs
+        if len(s) >= 2:
+            bom2 = s[:2]
+        else:
+            bom2 = None
+        if len(s) >= 4:
+            bom4 = s[:4]
+        else:
+            bom4 = None
+
+        # Assign values of first four bytes to: a, b, c, d; and last byte to: z
+        a, b, c, d, z = None, None, None, None, None
+        if len(s) >= 1:
+            a = ords[0]
+        if len(s) >= 2:
+            b = ords[1]
+        if len(s) >= 3:
+            c = ords[2]
+        if len(s) >= 4:
+            d = ords[3]
+
+        z = s[-1]
+        if isinstance(z, basestring):
+            z = ord(z)
+
+        if bom4 and ( (hasattr(codecs,'BOM_UTF32_LE') and bom4 == codecs.BOM_UTF32_LE) or
+                      (bom4 == utf32.BOM_UTF32_LE) ):
+            encoding = 'utf-32le'
+            s = s[4:]
+        elif bom4 and ( (hasattr(codecs,'BOM_UTF32_BE') and bom4 == codecs.BOM_UTF32_BE) or
+                        (bom4 == utf32.BOM_UTF32_BE) ):
+            encoding = 'utf-32be'
+            s = s[4:]
+        elif bom2 and bom2 == codecs.BOM_UTF16_LE:
+            encoding = 'utf-16le'
+            s = s[2:]
+        elif bom2 and bom2 == codecs.BOM_UTF16_BE:
+            encoding = 'utf-16be'
+            s = s[2:]
+
+        # No BOM, so autodetect encoding used by looking at first four
+        # bytes according to RFC 4627 section 3.  The first and last bytes
+        # in a JSON document will be ASCII.  The second byte will be ASCII
+        # unless the first byte was a quotation mark.
+
+        elif len(s)>=4 and a==0 and b==0 and c==0 and d!=0: # UTF-32BE  (0 0 0 x)
+            encoding = 'utf-32be'
+        elif len(s)>=4 and a!=0 and b==0 and c==0 and d==0 and z==0: # UTF-32LE  (x 0 0 0 [... 0])
+            encoding = 'utf-32le'
+        elif len(s)>=2 and a==0 and b!=0: # UTF-16BE  (0 x)
+            encoding = 'utf-16be'
+        elif len(s)>=2 and a!=0 and b==0 and z==0: # UTF-16LE  (x 0 [... 0])
+            encoding = 'utf-16le'
+        elif ord('\t') <= a <= 127:
+            # First byte appears to be ASCII, so guess UTF-8.
+            encoding = 'utf8'
+        else:
+            raise JSONDecodeError("Can not determine the Unicode encoding for this JSON document")
+
+        return encoding
+
+    @staticmethod
+    def auto_unicode_decode( s ):
+        """Takes a string (or byte array) and tries to convert it to a Unicode string.
+
+        This will return a Python unicode string type corresponding to the
+        input string (either str or unicode).  The character encoding is
+        guessed by looking for either a Unicode BOM prefix, or by the
+        rules specified by RFC 7158.  When in doubt it is assumed the
+        input is encoded in UTF-8 (the default for JSON).
+
+        The BOM (byte order mark) if present will be stripped off of the
+        returned string.
+
+        """
+        if isinstance(s, unicode):
+            return s  # Already Unicode
+
+        encoding = helpers.auto_detect_encoding( s )
+
+        # Make sure the encoding is supported by Python
+        cdk = helpers.lookup_codec( encoding )
+        if not cdk:
+            raise JSONDecodeError('no codec available for character encoding',encoding)
+
+        # See if codec accepts errors argument
+        try:
+            cdk.decode( helpers.make_raw_bytes([]), errors='strict' )
+        except TypeError:
+            cdk_kw = {}
+        else:
+            cdk_kw = {'errors': 'strict'}
+
+        # Convert to unicode using a standard codec (can raise UnicodeDecodeError)
+        unis, ulen = cdk.decode( s, **cdk_kw )
+        return unis
+
+    @staticmethod
+    def surrogate_pair_as_unicode( c1, c2 ):
+        """Takes a pair of unicode surrogates and returns the equivalent unicode character.
+
+        The input pair must be a surrogate pair, with c1 in the range
+        U+D800 to U+DBFF and c2 in the range U+DC00 to U+DFFF.
+
+        """
+        n1, n2 = ord(c1), ord(c2)
+        if n1 < 0xD800 or n1 > 0xDBFF or n2 < 0xDC00 or n2 > 0xDFFF:
+            raise JSONDecodeError('illegal Unicode surrogate pair',(c1,c2))
+        a = n1 - 0xD800
+        b = n2 - 0xDC00
+        v = (a << 10) | b
+        v += 0x10000
+        return unichr(v)
+
+    @staticmethod
+    def unicode_as_surrogate_pair( c ):
+        """Takes a single unicode character and returns a sequence of surrogate pairs.
+
+        The output of this function is a tuple consisting of one or two unicode
+        characters, such that if the input character is outside the BMP range
+        then the output is a two-character surrogate pair representing that character.
+
+        If the input character is inside the BMP then the output tuple will have
+        just a single character...the same one.
+
+        """
         n = ord(c)
-        if 0xD800 <= n <= 0xDFFF: # surrogate codepoints are prohibited by UTF-32
-            if errors == 'ignore':
-                continue
-            elif errors == 'replace':
-                n = ord('?')
+        if n < 0x10000:
+            return (unichr(n),)  # in BMP, surrogate pair not required
+        v = n - 0x10000
+        vh = (v >> 10) & 0x3ff   # highest 10 bits
+        vl = v & 0x3ff  # lowest 10 bits
+        w1 = 0xD800 | vh
+        w2 = 0xDC00 | vl
+        return (unichr(w1), unichr(w2))
+
+    @staticmethod
+    def isnumbertype( obj ):
+        """Is the object of a Python number type (excluding complex)?"""
+        return isinstance(obj, (int,long,float)) \
+               and not isinstance(obj, bool) \
+               or obj is nan or obj is inf or obj is neginf
+
+    @staticmethod
+    def isstringtype( obj ):
+        """Is the object of a Python string type?"""
+        if isinstance(obj, basestring):
+            return True
+        # Must also check for some other pseudo-string types
+        import types, UserString
+        return isinstance(obj, types.StringTypes) \
+               or isinstance(obj, UserString.UserString)
+               ## or isinstance(obj, UserString.MutableString)
+
+    @staticmethod
+    def decode_hex( hexstring ):
+        """Decodes a hexadecimal string into it's integer value."""
+        # We don't use the builtin 'hex' codec in python since it can
+        # not handle odd numbers of digits, nor raise the same type
+        # of exceptions we want to.
+        n = 0
+        for c in hexstring:
+            if '0' <= c <= '9':
+                d = ord(c) - ord('0')
+            elif 'a' <= c <= 'f':
+                d = ord(c) - ord('a') + 10
+            elif 'A' <= c <= 'F':
+                d = ord(c) - ord('A') + 10
             else:
-                cname = 'U+%04X'%n
-                raise UnicodeError('UTF-32 can not encode surrogate characters',cname)
-        write( pack(packlong, n) )
-    if sys.version_info.major >= 3:
-        return bytes(f)
-    else:
-        return f.getvalue()
+                raise ValueError('Not a hexadecimal number', hexstring)
+            # Could use ((n << 4 ) | d), but python 2.3 issues a FutureWarning.
+            n = (n * 16) + d
+        return n
 
-def utf32le_encode( obj, errors='strict' ):
-    return utf32_encode( obj, errors=errors, endian='LE' )
-
-def utf32be_encode( obj, errors='strict' ):
-    return utf32_encode( obj, errors=errors, endian='BE' )
-
-
-def utf32_decode( obj, errors='strict', endian='LE' ):
-    """Decodes a UTF-32LE byte string into a Unicode string."""
-    if endian.upper() in ['LE','LITTLE']:
-        packlong = '<L'
-    elif endian.upper() in ['BE','BIG']:
-        packlong = '>L'
-    else:
-        raise ValueError("Expected endian to be one of \"LE\" or \"BE\".", endian)
-
-    if len(obj) % 4 != 0:
-        raise UnicodeError('UTF-32 decode error, data length not a multiple of 4 bytes')
-    import struct
-    unpack = struct.unpack
-    chars = []
-    i = 0
-    for i in range(0, len(obj), 4):
-        seq = obj[i:i+4]
-        n = unpack(packlong,seq)[0]
-        chars.append( unichr(n) )
-    return u''.join( chars )
-
-def utf32le_decode( obj, errors='strict' ):
-    return utf32_decode( obj, errors=errors, endian='LE' )
-
-def utf32be_decode( obj, errors='strict' ):
-    return utf32_decode( obj, errors=errors, endian='BE' )
-
-
-def auto_unicode_decode( s ):
-    """Takes a string (or byte array) and tries to convert it to a Unicode string.
-
-    This will return a Python unicode string type corresponding to the
-    input string (either str or unicode).  The character encoding is
-    guessed by looking for either a Unicode BOM prefix, or by the
-    rules specified by RFC 7158.  When in doubt it is assumed the
-    input is encoded in UTF-8 (the default for JSON).
-
-    The BOM (byte order mark) if present will be stripped off of the
-    returned string.
-
-    """
-    if isinstance(s, unicode):
-        return s
-    if len(s) == 0:
-        return ''.decode('utf8')
-
-    # Get the byte values of up to the first 4 bytes
-    ords = []
-    for i in range(0, min(len(s),4)):
-        x = s[i]
-        if isinstance(x, basestring):
-            x = ord(x)
-        ords.append( x )
-
-    # Look for BOM marker
-    import sys, codecs
-    if len(s) >= 2:
-        bom2 = s[:2]
-    else:
-        bom2 = None
-    if len(s) >= 4:
-        bom4 = s[:4]
-    else:
-        bom4 = None
-
-    # Assign values of first four bytes to: a, b, c, d; and last byte to: z
-    a, b, c, d, z = None, None, None, None, None
-    if len(s) >= 1:
-        a = ords[0]
-    if len(s) >= 2:
-        b = ords[1]
-    if len(s) >= 3:
-        c = ords[2]
-    if len(s) >= 4:
-        d = ords[3]
-
-    z = s[-1]
-    if isinstance(z, basestring):
-        z = ord(z)
-
-    if bom4 and bom4 == codecs.BOM_UTF32_LE:
-        encoding = 'utf-32le'
-        s = s[4:]
-    elif bom4 and bom4 == codecs.BOM_UTF32_BE:
-        encoding = 'utf-32be'
-        s = s[4:]
-    elif bom2 and bom2 == codecs.BOM_UTF16_LE:
-        encoding = 'utf-16le'
-        s = s[2:]
-    elif bom2 and bom2 == codecs.BOM_UTF16_BE:
-        encoding = 'utf-16be'
-        s = s[2:]
-
-    # No BOM, so autodetect encoding used by looking at first four
-    # bytes according to RFC 4627 section 3.  The first and last bytes
-    # in a JSON document will be ASCII.  The second byte will be ASCII
-    # unless the first byte was a quotation mark.
-
-    elif len(s)>=4 and a==0 and b==0 and c==0 and d!=0: # UTF-32BE  (0 0 0 x)
-        encoding = 'utf-32be'
-    elif len(s)>=4 and a!=0 and b==0 and c==0 and d==0 and z==0: # UTF-32LE  (x 0 0 0 [... 0])
-        encoding = 'utf-32le'
-    elif len(s)>=2 and a==0 and b!=0: # UTF-16BE  (0 x)
-        encoding = 'utf-16be'
-    elif len(s)>=2 and a!=0 and b==0 and z==0: # UTF-16LE  (x 0 [... 0])
-        encoding = 'utf-16le'
-    elif ord('\t') <= a <= 127:
-        # First byte appears to be ASCII, so guess UTF-8.
-        encoding = 'utf8'
-    else:
-        raise JSONDecodeError("Can not determine the Unicode encoding for this JSON document")
-
-    # Make sure the encoding is supported by Python
-    try:
-        cdk = codecs.lookup(encoding)
-    except LookupError:
-        if encoding.startswith('utf-32') \
-               or encoding.startswith('ucs4') \
-               or encoding.startswith('ucs-4'):
-            # Python doesn't natively have a UTF-32 codec, but JSON
-            # requires that it be supported.  So we must decode these
-            # manually.
-            if encoding.endswith('le'):
-                unis = utf32le_decode(s)
+    @staticmethod
+    def decode_octal( octalstring ):
+        """Decodes an octal string into it's integer value."""
+        n = 0
+        for c in octalstring:
+            if '0' <= c <= '7':
+                d = ord(c) - ord('0')
             else:
-                unis = utf32be_decode(s)
-        else:
-            raise JSONDecodeError('this python has no codec for this character encoding',encoding)
-    else:
-        # Convert to unicode using a standard codec
-        try:
-            unis = s.decode(encoding)
-        except UnicodeDecodeError, err:
-            # Convert UnicodeDecodeError into JSONDecodeError
-            raise JSONDecodeError("Unicode %s error: %s" % (encoding, str(err)) )
-    return unis
+                raise ValueError('Not an octal number', octalstring)
+            # Could use ((n << 3 ) | d), but python 2.3 issues a FutureWarning.
+            n = (n * 8) + d
+        return n
+
+##!!!!
 
 
-def surrogate_pair_as_unicode( c1, c2 ):
-    """Takes a pair of unicode surrogates and returns the equivalent unicode character.
-
-    The input pair must be a surrogate pair, with c1 in the range
-    U+D800 to U+DBFF and c2 in the range U+DC00 to U+DFFF.
-
-    """
-    n1, n2 = ord(c1), ord(c2)
-    if n1 < 0xD800 or n1 > 0xDBFF or n2 < 0xDC00 or n2 > 0xDFFF:
-        raise JSONDecodeError('illegal Unicode surrogate pair',(c1,c2))
-    a = n1 - 0xD800
-    b = n2 - 0xDC00
-    v = (a << 10) | b
-    v += 0x10000
-    return unichr(v)
-
-
-def unicode_as_surrogate_pair( c ):
-    """Takes a single unicode character and returns a sequence of surrogate pairs.
-
-    The output of this function is a tuple consisting of one or two unicode
-    characters, such that if the input character is outside the BMP range
-    then the output is a two-character surrogate pair representing that character.
-
-    If the input character is inside the BMP then the output tuple will have
-    just a single character...the same one.
-
-    """
-    n = ord(c)
-    if n < 0x10000:
-        return (unichr(n),)  # in BMP, surrogate pair not required
-    v = n - 0x10000
-    vh = (v >> 10) & 0x3ff   # highest 10 bits
-    vl = v & 0x3ff  # lowest 10 bits
-    w1 = 0xD800 | vh
-    w2 = 0xDC00 | vl
-    return (unichr(w1), unichr(w2))
-
-
-# ----------------------------------------------------------------------
-# Type identification
-
-def isnumbertype( obj ):
-    """Is the object of a Python number type (excluding complex)?"""
-    return isinstance(obj, (int,long,float)) \
-           and not isinstance(obj, bool) \
-           or obj is nan or obj is inf or obj is neginf
-
-
-def isstringtype( obj ):
-    """Is the object of a Python string type?"""
-    if isinstance(obj, basestring):
-        return True
-    # Must also check for some other pseudo-string types
-    import types, UserString
-    return isinstance(obj, types.StringTypes) \
-           or isinstance(obj, UserString.UserString)
-
-
-# ----------------------------------------------------------------------
-# Numeric helpers
-
-def decode_hex( hexstring ):
-    """Decodes a hexadecimal string into it's integer value."""
-    # We don't use the builtin 'hex' codec in python since it can
-    # not handle odd numbers of digits, nor raise the same type
-    # of exceptions we want to.
-    n = 0
-    for c in hexstring:
-        if '0' <= c <= '9':
-            d = ord(c) - ord('0')
-        elif 'a' <= c <= 'f':
-            d = ord(c) - ord('a') + 10
-        elif 'A' <= c <= 'F':
-            d = ord(c) - ord('A') + 10
-        else:
-            raise JSONDecodeError('not a hexadecimal number',hexstring)
-        # Could use ((n << 4 ) | d), but python 2.3 issues a FutureWarning.
-        n = (n * 16) + d
-    return n
-
-
-def decode_octal( octalstring ):
-    """Decodes an octal string into it's integer value."""
-    n = 0
-    for c in octalstring:
-        if '0' <= c <= '7':
-            d = ord(c) - ord('0')
-        else:
-            raise JSONDecodeError('not an octal number',octalstring)
-        # Could use ((n << 3 ) | d), but python 2.3 issues a FutureWarning.
-        n = (n * 8) + d
-    return n
 
 
 # ----------------------------------------------------------------------
@@ -955,6 +1242,8 @@ class JSON(object):
                     '\f': '\\f',
                     '"': '\\"',
                     '\\': '\\\\'}
+
+    json_syntax_characters = u"{}[]\"\\,:0123456789.-+abcdefghijklmnopqrstuvwxyz \t\n\r"
 
     all_hook_names = ('decode_number', 'decode_float', 'decode_object', 'decode_array', 'decode_string',
                       'encode_value', 'encode_dict', 'encode_dict_key', 'encode_sequence', 'encode_bytes', 'encode_default')
@@ -1252,32 +1541,6 @@ class JSON(object):
             return True
         return False
 
-    def strip_format_control_chars(self, txt):
-        """Filters out all Unicode format control characters from the string.
-
-        ECMAScript permits any Unicode "format control characters" to
-        appear at any place in the source code.  They are to be
-        ignored as if they are not there before any other lexical
-        tokenization occurs.  Note that JSON does not allow them.
-
-        Ref. ECMAScript section 7.1.
-
-        There are dozens of Format Control Characters, for example:
-            U+00AD   SOFT HYPHEN
-            U+200B   ZERO WIDTH SPACE
-            U+2060   WORD JOINER
-
-        """
-        import unicodedata
-        txt2 = filter( lambda c: unicodedata.category(unicode(c)) != 'Cf', txt )
-
-        # 2to3 NOTE: The following is needed to work around a broken
-        # Python3 conversion in which filter() will be transformed
-        # into a list rather than a string.
-        if not isinstance(txt2,basestring):
-            txt2 = u''.join(txt2)
-        return txt2
-
 
     def decode_null(self, s, i=0):
         """Intermediate-level decoder for ECMAScript 'null' keyword.
@@ -1377,11 +1640,12 @@ class JSON(object):
             else:
                 raise JSONDecodeError('Infinity literals are not allowed in strict JSON')
         elif s[j:j+2] in ('0x','0X'):
+            hexdig = helpers.hexdigits
             if self._allow_hex_numbers:
                 k = j+2
-                while k < imax and s[k] in hexdigits:
+                while k < imax and s[k] in hexdig:
                     k += 1
-                n = sign * decode_hex( s[j+2:k] )
+                n = sign * helpers.decode_hex( s[j+2:k] )
                 return n, k
             else:
                 raise JSONDecodeError('hexadecimal literals are not allowed in strict JSON',s[i:])
@@ -1396,7 +1660,7 @@ class JSON(object):
             sigdigits = 0 # number of significant digits (approx, counts end zeros)
             while k < imax and (s[k].isdigit() or s[k] in '.+-eE'):
                 c = s[k]
-                if c not in octaldigits:
+                if c not in helpers.octaldigits:
                     could_be_octal = False
                 if c == '.':
                     if decpt is not None or ept is not None:
@@ -1425,7 +1689,7 @@ class JSON(object):
             # is not enabled (the ECMAScipt standard) then just do
             # nothing and treat the string as a decimal number.
             if could_be_octal and self._allow_octal_numbers:
-                n = sign * decode_octal( number )
+                n = sign * helpers.decode_octal( number )
                 return n, k
 
             # A decimal number.  Do a quick check on JSON syntax restrictions.
@@ -1572,10 +1836,11 @@ class JSON(object):
                         maxdigits = 3
                     else:
                         maxdigits = 2
+                    octdig = helpers.octaldigits
                     for k in range(i, i+maxdigits+1):
-                        if k >= imax or s[k] not in octaldigits:
+                        if k >= imax or s[k] not in octdig:
                             break
-                    n = decode_octal(s[i:k])
+                    n = helpers.decode_octal(s[i:k])
                     if n < 128:
                         _append( chr(n) )
                     else:
@@ -1596,10 +1861,10 @@ class JSON(object):
                         digits = 2
                     if i+digits >= imax:
                         raise JSONDecodeError('numeric character escape sequence is truncated',s[i-1:])
-                    n = decode_hex( s[i:i+digits] )
+                    n = helpers.decode_hex( s[i:i+digits] )
                     if high_surrogate:
                         # Decode surrogate pair and clear high surrogate
-                        _append( surrogate_pair_as_unicode( high_surrogate, unichr(n) ) )
+                        _append( helpers.surrogate_pair_as_unicode( high_surrogate, unichr(n) ) )
                         high_surrogate = None
                     elif n < 128:
                         # ASCII chars always go in as a str
@@ -1634,7 +1899,8 @@ class JSON(object):
                 # all at once rather than one a time, for speed.
                 j = i
                 i += 1
-                while i < imax and s[i] not in unsafe_string_chars and s[i] != closer:
+                unsafe = helpers.unsafe_string_chars
+                while i < imax and s[i] not in unsafe and s[i] != closer:
                     i += 1
                 _append(s[j:i])
         if not done:
@@ -1709,7 +1975,7 @@ class JSON(object):
                 raise JSONEncodeError('can not include or escape a Unicode surrogate character',cname)
             else:
                 # Some other Unicode character
-                ccat = unicodedata.category(c)
+                ccat = unicodedata.category( unichr(cord) )
                 if cord <= 0xFFFF:
                     # Other BMP Unicode character
                     if ccat in ['Cc','Cf','Zl','Zp']:
@@ -1732,7 +1998,7 @@ class JSON(object):
                     else:
                         doesc = encunicode( c )
                     if doesc:
-                        for surrogate in unicode_as_surrogate_pair(c):
+                        for surrogate in helpers.unicode_as_surrogate_pair(c):
                             chunks.append(r'\u%04x' % ord(surrogate))
                     else:
                         chunks.append( c )
@@ -1879,8 +2145,8 @@ class JSON(object):
                     i = self.skipws(txt, r[1], imax)
                     if isdict:
                         key = r[0]  # Ref 11.1.5
-                        if not isstringtype(key):
-                            if isnumbertype(key):
+                        if not helpers.isstringtype(key):
+                            if helpers.isnumbertype(key):
                                 if not self._allow_nonstring_keys:
                                     raise JSONDecodeError('strict JSON only permits string literals as object properties (dictionary keys)',txt[starti:])
                             else:
@@ -1990,7 +2256,7 @@ class JSON(object):
     def decode(self, txt):
         """Decodes a JSON-endoded string into a Python object."""
         if self._allow_unicode_format_control_chars:
-            txt = self.strip_format_control_chars(txt)
+            txt = helpers.strip_format_control_chars(txt)
         r = self.decodeobj(txt, 0, only_object_or_array=not self._allow_any_type_at_start)
         if not r:
             raise JSONDecodeError('can not decode value',txt)
@@ -2038,7 +2304,7 @@ class JSON(object):
         elif isinstance(obj, (int,long,float,complex)) or\
                 (decimal and isinstance(obj, decimal.Decimal)):
             c = 'number'
-        elif isinstance(obj, basestring) or isstringtype(obj):
+        elif isinstance(obj, basestring) or helpers.isstringtype(obj):
             c = 'string'
         else:
             if isinstance(obj,dict):
@@ -2221,8 +2487,8 @@ class JSON(object):
                                 obj2 = newkey
 
                         # Check JSON restrictions on key types
-                        if not isstringtype(obj2):
-                            if isnumbertype(obj2):
+                        if not helpers.isstringtype(obj2):
+                            if helpers.isnumbertype(obj2):
                                 if not self._allow_nonstring_keys:
                                     raise JSONEncodeError('object properties (dictionary keys) must be strings in strict JSON',obj2)
                             else:
@@ -2328,7 +2594,11 @@ class JSON(object):
 
 # ------------------------------
 
-def encode( obj, strict=False, compactly=True, escape_unicode=False, encoding=None,
+def encode( obj,
+            strict=False,
+            compactly=True,
+            escape_unicode=False,
+            encoding=None,
             encode_namedtuple_as_object=True,
             **kw ):
     """Encodes a Python object into a JSON-encoded string.
@@ -2343,88 +2613,92 @@ def encode( obj, strict=False, compactly=True, escape_unicode=False, encoding=No
     string will be "pretty printed" with whitespace and indentation
     added to make it more readable.
 
-    If 'escape_unicode' is set to True, then all non-ASCII characters
-    will be represented as a unicode escape sequence; if False then
-    the actual real unicode character will be inserted.
-
-    If no encoding is specified (encoding=None) then the output will
-    either be a Python string (if entirely ASCII) or a Python unicode
-    string type.
-
-    However if an encoding name is given then the returned value will
-    be a python string which is the byte sequence encoding the JSON
-    value.  As the default/recommended encoding for JSON is UTF-8,
-    you should almost always pass in encoding='utf8'.
-
     If 'encode_namedtuple_as_object' is True, then objects of type
     namedtuple, or subclasses of 'tuple' that have an _asdict()
     method, will be encoded as an object rather than an array.
 
+    CONCERNING CHARACTER ENCODING:
+
+    The 'encoding' argument should be one of:
+
+        * None - The return will be a Unicode string.
+        * encoding_name - A string which is the name of a known
+              encoding, such as 'UTF-8' or 'ascii'.
+        * codec - A CodecInfo object, such as as found by codecs.lookup().
+              This allows you to use a custom codec as well as those
+              built into Python.
+
+    If an encoding is given (either by name or by codec), then the
+    returned value will be a byte array (Python 3), or a 'str' string
+    (Python 2); which represents the raw set of bytes.  Otherwise,
+    if encoding is None, then the returned value will be a Unicode
+    string.
+
+    The 'escape_unicode' argument is used to determine which characters
+    in string literals must be \u escaped.  Should be one of:
+
+        * True  -- All non-ASCII characters are always \u escaped.
+        * False -- Try to insert actual Unicode characters if possible.
+        * function -- A user-supplied function that accepts a single
+             unicode character and returns True or False; where True
+             means to \u escape that character.
+
+    Regardless of escape_unicode, certain characters will always be
+    \u escaped. Additionaly any characters not in the output encoding
+    repertoire for the encoding codec will be \u escaped as well.
+
     """
-    import sys
-    encoder = None # Custom codec encoding function
-    bom = None  # Byte order mark to prepend to final output
-    cdk = None  # Codec to use
-    if encoding is not None:
-        import codecs
-        try:
-            cdk = codecs.lookup(encoding)
-        except LookupError:
-            cdk = None
+    import sys, codecs
 
-        if cdk:
-            pass
-        elif not cdk:
-            # No built-in codec was found, see if it is something we
-            # can do ourself.
-            encoding = encoding.lower()
-            if encoding.startswith('utf-32') or encoding.startswith('utf32') \
-                   or encoding.startswith('ucs4') \
-                   or encoding.startswith('ucs-4'):
-                # Python doesn't natively have a UTF-32 codec, but JSON
-                # requires that it be supported.  So we must decode these
-                # manually.
-                if encoding.endswith('le'):
-                    encoder = utf32le_encode
-                elif encoding.endswith('be'):
-                    encoder = utf32be_encode
-                else:
-                    encoder = utf32be_encode
-                    bom = codecs.BOM_UTF32_BE
-            elif encoding.startswith('ucs2') or encoding.startswith('ucs-2'):
-                # Python has no UCS-2, but we can simulate with
-                # UTF-16.  We just need to force us to not try to
-                # encode anything past the BMP.
-                encoding = 'utf-16'
-                if not escape_unicode and not callable(escape_unicode):
-                   escape_unicode = lambda c: (0xD800 <= ord(c) <= 0xDFFF) or ord(c) >= 0x10000
-            else:
-                raise JSONEncodeError('this python has no codec for this character encoding',encoding)
+    # Find the codec to use. CodecInfo will be in 'cdk' and name in 'encoding'.
+    if encoding is None:
+        cdk = None
+    elif isinstance(encoding, codecs.CodecInfo):
+        cdk = encoding
+        encoding = cdk.name
+    else:
+        cdk = helpers.lookup_codec( encoding )
+        if not cdk:
+            raise JSONEncodeError('no codec available for character encoding',encoding)
 
-    if not escape_unicode and not callable(escape_unicode):
-        if encoding and encoding.startswith('utf'):
+    if escape_unicode and callable(escape_unicode):
+        pass  # User-supplied repertoire test function
+    else:
+        if escape_unicode==True or not cdk or cdk.name.lower() == 'ascii':
+            # ASCII, ISO8859-1, or and Unknown codec -- \u escape anything not ASCII
+            def escape_unicode( c ):
+                return ord(c) >= 0x80
+        elif cdk.name == 'iso8859-1':
+            def escape_unicode( c ):
+                return ord(c) >= 0x100
+        elif cdk and cdk.name.lower().startswith('utf'):
             # All UTF-x encodings can do the whole Unicode repertoire, so
             # do nothing special.
-            pass
+            escape_unicode = False
         else:
-            # Even though we don't want to escape all unicode chars,
-            # the encoding being used may force us to do so anyway.
-            # We must pass in a function which says which characters
-            # the encoding can handle and which it can't.
-            def in_repertoire( c, encoding_func ):
+            # An unusual codec.  We need to test every character
+            # to see if it is in the codec's repertoire to determine
+            # if we should \u escape that character.
+            enc_func = cdk.encode
+            def escape_unicode( c ):
                 try:
-                    x = encoding_func( c, errors='strict' )
-                except UnicodeError:
+                    enc_func( c )
+                except UnicodeEncodeError:
+                    return True
+                else:
                     return False
-                return True
-            if encoder:
-                escape_unicode = lambda c: not in_repertoire(c, encoder)
-            elif cdk:
-                escape_unicode = lambda c: not in_repertoire(c, cdk[0])
-            else:
-                pass # Let the JSON object deal with it
 
-    j = JSON( strict=strict, compactly=compactly, escape_unicode=escape_unicode,
+    # Make sure the encoding is not degenerate
+    if encoding is not None:
+        try:
+            output, nchars = cdk.encode( JSON.json_syntax_characters )
+        except UnicodeError, err:
+            raise JSONEncodeError("Output encoding %s is not sufficient to encode JSON" % cdk.name)
+
+    # Do the JSON encoding
+    j = JSON( strict=strict,
+              compactly=compactly,
+              escape_unicode=escape_unicode,
               encode_namedtuple_as_object=encode_namedtuple_as_object )
 
     for keyword, value in kw.items():
@@ -2434,15 +2708,23 @@ def encode( obj, strict=False, compactly=True, escape_unicode=False, encoding=No
             raise TypeError("%s.%s(): Unknown keyword argument %r" % (__name__,'encode',keyword))
 
     unitxt = j.encode( obj )
-    if encoder:
-        txt = encoder( unitxt )
-    elif encoding is not None:
-        txt = unitxt.encode( encoding )
+
+    # Do the final Unicode encoding
+    if encoding is None:
+        output = unitxt
     else:
-        txt = unitxt
-    if bom:
-        txt = bom + txt
-    return txt
+        try:
+            output, nchars = cdk.encode( unitxt )
+        except UnicodeEncodeError, err:
+            # Re-raise as a JSONDecodeError
+            e2 = sys.exc_info()
+            newerr = JSONEncodeError("a Unicode encoding error occurred")
+            # Simulate Python 3's: "raise X from Y" exception chaining
+            newerr.__cause__ = err
+            newerr.__traceback__ = e2[2]
+            raise newerr
+
+    return output
 
 
 def decode( txt, strict=False, encoding=None, **kw ):
@@ -2496,6 +2778,7 @@ def decode( txt, strict=False, encoding=None, **kw ):
     See the hooks documentation on the JSON.set_hook() method.
 
     """
+    import sys
     # Initialize the JSON object
     j = JSON( strict=strict )
     for keyword, value in kw.items():
@@ -2521,50 +2804,38 @@ def decode( txt, strict=False, encoding=None, **kw ):
     if isinstance(txt,unicode):
         unitxt = txt
     else:
+        # Find codec to use.  CodecInfo will be in 'cdk' and name in 'encoding'.
         if encoding is None:
-            unitxt = auto_unicode_decode( txt )
+            cdk = None
+        elif isinstance(encoding, codecs.CodecInfo):
+            cdk = encoding
+            encoding = cdk.name
         else:
-            cdk = None # codec
-            decoder = None
-            import codecs
-            try:
-                cdk = codecs.lookup(encoding)
-            except LookupError:
-                encoding = encoding.lower()
-                decoder = None
-                if encoding.startswith('utf-32') \
-                       or encoding.startswith('ucs4') \
-                       or encoding.startswith('ucs-4'):
-                    # Python doesn't natively have a UTF-32 codec, but JSON
-                    # requires that it be supported.  So we must decode these
-                    # manually.
-                    if encoding.endswith('le'):
-                        decoder = utf32le_decode
-                    elif encoding.endswith('be'):
-                        decoder = utf32be_decode
-                    else:
-                        if txt.startswith( codecs.BOM_UTF32_BE ):
-                            decoder = utf32be_decode
-                            txt = txt[4:]
-                        elif txt.startswith( codecs.BOM_UTF32_LE ):
-                            decoder = utf32le_decode
-                            txt = txt[4:]
-                        else:
-                            if encoding.startswith('ucs'):
-                                raise JSONDecodeError('UCS-4 encoded string must start with a BOM')
-                            decoder = utf32be_decode # Default BE for UTF, per unicode spec
-                elif encoding.startswith('ucs2') or encoding.startswith('ucs-2'):
-                    # Python has no UCS-2, but we can simulate with
-                    # UTF-16.  We just need to force us to not try to
-                    # encode anything past the BMP.
-                    encoding = 'utf-16'
+            cdk = helpers.lookup_codec( encoding )
+            if not cdk:
+                raise JSONDecodeError('no codec available for character encoding',encoding)
 
-            if decoder:
-                unitxt = decoder(txt)
-            elif encoding:
-                unitxt = txt.decode(encoding)
+        # Invoke the codec to decode
+        try:
+            if not cdk:
+                unitxt = helpers.auto_unicode_decode( txt )
             else:
-                raise JSONDecodeError('this python has no codec for this character encoding',encoding)
+                try:
+                    cdk.decode( helpers.make_raw_bytes([]), errors='strict' )
+                except TypeError:
+                    cdk_kw = {}  # This coded doesn't like the errors argument
+                else:
+                    cdk_kw = {'errors': 'strict'}
+
+                unitxt, numbytes = cdk.decode( txt, **cdk_kw )
+        except UnicodeDecodeError, err:
+            # Re-raise as a JSONDecodeError
+            e2 = sys.exc_info()
+            newerr = JSONDecodeError("a Unicode decoding error occurred")
+            # Simulate Python 3's: "raise X from Y" exception chaining
+            newerr.__cause__ = err
+            newerr.__traceback__ = e2[2]
+            raise newerr
 
         # Check that the decoding seems sane.  Per RFC 4627 section 3:
         #    "Since the first two characters of a JSON text will
