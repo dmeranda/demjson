@@ -127,13 +127,12 @@ CLASSES
     codecs.CodecInfo(__builtin__.tuple)
         utf32
     exceptions.Exception(exceptions.BaseException)
-        JSONSkipHook
-    exceptions.ValueError(exceptions.StandardError)
         JSONError
             JSONDecodeError
                 JSONDecodeHookError
             JSONEncodeError
                 JSONEncodeHookError
+        JSONSkipHook
     
     class JSON(__builtin__.object)
      |  An encoder/decoder for JSON data streams.
@@ -484,8 +483,6 @@ CLASSES
      |  Method resolution order:
      |      JSONDecodeError
      |      JSONError
-     |      exceptions.ValueError
-     |      exceptions.StandardError
      |      exceptions.Exception
      |      exceptions.BaseException
      |      __builtin__.object
@@ -501,13 +498,13 @@ CLASSES
      |      list of weak references to the object (if defined)
      |  
      |  ----------------------------------------------------------------------
-     |  Methods inherited from exceptions.ValueError:
+     |  Methods inherited from exceptions.Exception:
      |  
      |  __init__(...)
      |      x.__init__(...) initializes x; see help(type(x)) for signature
      |  
      |  ----------------------------------------------------------------------
-     |  Data and other attributes inherited from exceptions.ValueError:
+     |  Data and other attributes inherited from exceptions.Exception:
      |  
      |  __new__ = <built-in method __new__ of type object>
      |      T.__new__(S, ...) -> a new object with type S, a subtype of T
@@ -562,8 +559,6 @@ CLASSES
      |      JSONDecodeHookError
      |      JSONDecodeError
      |      JSONError
-     |      exceptions.ValueError
-     |      exceptions.StandardError
      |      exceptions.Exception
      |      exceptions.BaseException
      |      __builtin__.object
@@ -584,7 +579,7 @@ CLASSES
      |      list of weak references to the object (if defined)
      |  
      |  ----------------------------------------------------------------------
-     |  Data and other attributes inherited from exceptions.ValueError:
+     |  Data and other attributes inherited from exceptions.Exception:
      |  
      |  __new__ = <built-in method __new__ of type object>
      |      T.__new__(S, ...) -> a new object with type S, a subtype of T
@@ -636,8 +631,6 @@ CLASSES
      |  Method resolution order:
      |      JSONEncodeError
      |      JSONError
-     |      exceptions.ValueError
-     |      exceptions.StandardError
      |      exceptions.Exception
      |      exceptions.BaseException
      |      __builtin__.object
@@ -653,13 +646,13 @@ CLASSES
      |      list of weak references to the object (if defined)
      |  
      |  ----------------------------------------------------------------------
-     |  Methods inherited from exceptions.ValueError:
+     |  Methods inherited from exceptions.Exception:
      |  
      |  __init__(...)
      |      x.__init__(...) initializes x; see help(type(x)) for signature
      |  
      |  ----------------------------------------------------------------------
-     |  Data and other attributes inherited from exceptions.ValueError:
+     |  Data and other attributes inherited from exceptions.Exception:
      |  
      |  __new__ = <built-in method __new__ of type object>
      |      T.__new__(S, ...) -> a new object with type S, a subtype of T
@@ -714,8 +707,6 @@ CLASSES
      |      JSONEncodeHookError
      |      JSONEncodeError
      |      JSONError
-     |      exceptions.ValueError
-     |      exceptions.StandardError
      |      exceptions.Exception
      |      exceptions.BaseException
      |      __builtin__.object
@@ -736,7 +727,7 @@ CLASSES
      |      list of weak references to the object (if defined)
      |  
      |  ----------------------------------------------------------------------
-     |  Data and other attributes inherited from exceptions.ValueError:
+     |  Data and other attributes inherited from exceptions.Exception:
      |  
      |  __new__ = <built-in method __new__ of type object>
      |      T.__new__(S, ...) -> a new object with type S, a subtype of T
@@ -782,13 +773,11 @@ CLASSES
      |  
      |  message
     
-    class JSONError(exceptions.ValueError)
+    class JSONError(exceptions.Exception)
      |  Our base class for all JSON-related errors.
      |  
      |  Method resolution order:
      |      JSONError
-     |      exceptions.ValueError
-     |      exceptions.StandardError
      |      exceptions.Exception
      |      exceptions.BaseException
      |      __builtin__.object
@@ -804,13 +793,13 @@ CLASSES
      |      list of weak references to the object (if defined)
      |  
      |  ----------------------------------------------------------------------
-     |  Methods inherited from exceptions.ValueError:
+     |  Methods inherited from exceptions.Exception:
      |  
      |  __init__(...)
      |      x.__init__(...) initializes x; see help(type(x)) for signature
      |  
      |  ----------------------------------------------------------------------
-     |  Data and other attributes inherited from exceptions.ValueError:
+     |  Data and other attributes inherited from exceptions.Exception:
      |  
      |  __new__ = <built-in method __new__ of type object>
      |      T.__new__(S, ...) -> a new object with type S, a subtype of T
@@ -1370,9 +1359,10 @@ FUNCTIONS
 DATA
     __author__ = 'Deron Meranda <http://deron.meranda.us/>'
     __credits__ = 'Copyright (c) 2006-2014 Deron E. Meranda <http:/.../lic...
-    __date__ = '2014-04-13'
+    __date__ = '2014-05-02'
     __homepage__ = 'http://deron.meranda.us/python/demjson/'
-    __version__ = '1.7'
+    __version__ = '2.0'
+    __version_info__ = version_info(major=2, minor=0, micro=0)
     content_type = 'application/json'
     file_ext = 'json'
     float_maxexp = 307
@@ -1381,12 +1371,14 @@ DATA
     nan = nan
     neginf = -inf
     undefined = demjson.undefined
+    version = '2.0'
+    version_info = version_info(major=2, minor=0, micro=0)
 
 VERSION
-    1.7
+    2.0
 
 DATE
-    2014-04-13
+    2014-05-02
 
 AUTHOR
     Deron Meranda <http://deron.meranda.us/>

@@ -50,8 +50,17 @@ To use the accompaning "jsonlint" command script:
 What's new
 ==========
 
-These are the changes from 1.6 to 1.7 (released 2014-04-13).  See the
+These are the changes from 1.6 to 2.0 (released 2014-05-02).  See the
 file "docs/CHANGES.txt" for a complete history of changes.
+
+This is a major new version that contains many added features and
+enhanced functionality, as well as a small number of backwards
+incompatibilities.  Where possible these incompatibilities were kept
+to a minimum, however it is highly recommended that you read these
+change notes thoroughly.
+
+ Major changes
+ -------------
 
  * Python 3: This version supports both Python 2 and Python 3, via the
    2to3 conversion program.  When installing with setup.py or a PyPI
@@ -161,11 +170,9 @@ file "docs/CHANGES.txt" for a complete history of changes.
        - UnicodeDecodeError is transformed into JSONDecodeError
        - UnicodeEncodeError is transformed into JSONEncodeError
 
-   When running in Python 3 the standard Exception Chaining (PEP 3134)
-   mechanism is employed.  Under Python 2 exception chaining is
-   simulated, but a printed traceback of the original exception may
-   not be printed. You can get to the original exception in the
-   __cause__ member of the outer exception.
+   The original exception is made available inside the top-most error
+   using Python's Exception Chaining mechanism (described in the
+   Errors and Warnings change notes).
 
  * Unicode escapes: When outputting JSON certain additional characters
    in strings will now always be \u-escaped to increase compatibility
@@ -193,8 +200,20 @@ file "docs/CHANGES.txt" for a complete history of changes.
    you had been using try...except blocks with ValueError then you
    will need to change; preferably to catch JSONError.
 
- jsonlint command
- ----------------
+ * Exception chaining: Any errors that are incidentally raised during
+   JSON encoding or decoding, such as UnicodeDecodeError or anything
+   raised by user-supplied hook functions, will now be wrapped inside
+   a standard JSONError (or subclass).
+
+   When running in Python 3 the standard Exception Chaining (PEP 3134)
+   mechanism is employed.  Under Python 2 exception chaining is
+   simulated, but a printed traceback of the original exception may
+   not be printed. The original exception is in the __cause__ member
+   of the outer exception and it's traceback in the __traceback__
+   member.
+
+ The jsonlint command
+ --------------------
 
  * The "jsonlint" command script will now be installed by default.
 

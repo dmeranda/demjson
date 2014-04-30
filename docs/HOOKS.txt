@@ -1,0 +1,19 @@
+Using callback hooks in demjson
+===============================
+
+Starting with demjson release 2.0 it is possible to hook into the
+encoding and decoding engine to transform values.  There are a set of
+hooks available to use during JSON decoding and another set of hooks
+to use during encoding.
+
+    Decoding Hooks         Encoding Hooks
+    decode_string          encode_value
+    decode_float           encode_dict
+    decode_number          encode_dict_key
+    decode_array           encode_sequence
+    decode_object          encode_bytes
+                           encode_default
+
+Although hooks can be quite powerful, they are not necessarily
+suitable for every situation.  You may need to perform some complex
+transformations outside of demjson.

@@ -6,7 +6,7 @@ PYTHON=python
 PYDOC=pydoc
 
 MODULE=demjson
-VERSION=1.7
+VERSION=2.0
 
 SOURCES = $(MODULE).py
 SETUP = setup.py
@@ -64,13 +64,13 @@ docs/jsonlint.txt: jsonlint
 	PYTHONPATH=. ./jsonlint --help >$@
 
 docs/$(MODULE).txt:     $(MODULE).py
-	pydoc $(MODULE) | sed -e 's|/home/dem/.*/||' >docs/$(MODULE).txt
+	pydoc $(MODULE) | sed -e 's|/home/[a-zA-Z0-9_/.-]*/$(MODULE)/dev/||' >docs/$(MODULE).txt
 
 docs/$(MODULE).html:    $(MODULE).py
 	$(PYDOC) -w $(MODULE)
-	sed -e 's|file:/home/dem/public_html|http://deron.meranda.us|g' \
-	   -e 's|>/home/dem/public_html/python/$(MODULE)/[0-9.]*/|>|g' \
-	   -e 's|http://deron.meranda.us/[a-zA-Z0-9_/.-]*/||g' \
+	sed -e 's|file:/home/[a-zA-Z0-9_]+/public_html|http://deron.meranda.us|g' \
+	   -e 's|>/home/[a-zA-Z0-9_]+/public_html/python/$(MODULE)/[a-zA-Z0-9.]*/|>|g' \
+	   -e 's|>/home/[a-zA-Z0-9/.-]*/$(MODULE)/dev/|>|g' \
+	   -e 's|file:/[^<>]*/dev/|../|g' \
 	<$(MODULE).html >docs/$(MODULE).html
 	rm -f $(MODULE).html
-

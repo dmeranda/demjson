@@ -934,6 +934,8 @@ class DemjsonTest(unittest.TestCase):
 
 def run_all_tests():
     print 'Running with demjson version', demjson.__version__
+    if int( demjson.__version__.split('.',1)[0] ) < 2:
+        print 'WARNING: TESTING AGAINST AN OLD VERSION!'
     unittest.main()
     
 if __name__ == '__main__':

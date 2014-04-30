@@ -118,9 +118,18 @@ r""" A JSON data encoder and decoder.
 """
 
 __author__ = "Deron Meranda <http://deron.meranda.us/>"
-__date__ = "2014-04-13"
-__version__ = "1.7"
 __homepage__ = "http://deron.meranda.us/python/demjson/"
+
+__date__ = "2014-05-02"
+__version__ = "2.0"
+__version_info__ = ( 2, 0, 0 )
+try:
+    from collections import namedtuple as _nt
+    __version_info__ = _nt('version_info', ['major', 'minor', 'micro'])( *__version_info__ )
+except ImportError:
+    pass
+version, version_info = __version__, __version_info__
+
 __credits__ = """Copyright (c) 2006-2014 Deron E. Meranda <http://deron.meranda.us/>
 
 Licensed under GNU LGPL (GNU Lesser General Public License) version 3.0
