@@ -10,7 +10,7 @@ VERSION=2.0
 
 SOURCES = $(MODULE).py
 SETUP = setup.py
-READMES = README.txt LICENSE.txt docs/AUTHORS.txt docs/CHANGES.txt docs/INSTALL.txt docs/NEWS.txt
+READMES = README.txt LICENSE.txt docs/CHANGES.txt docs/INSTALL.txt docs/NEWS.txt
 TESTS = test/test_$(MODULE).py
 #DOCS = docs/$(MODULE).html docs/$(MODULE).txt docs/jsonlint.txt
 DOCS = docs/$(MODULE).txt docs/jsonlint.txt
