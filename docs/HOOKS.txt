@@ -6,7 +6,11 @@ encoding and decoding engine to transform values.  There are a set of
 hooks available to use during JSON decoding and another set of hooks
 to use during encoding.
 
+The complete descriptions of all the available hooks appear at the end
+of this document, but in summary they are:
+
     Decoding Hooks         Encoding Hooks
+    --------------         --------------
     decode_string          encode_value
     decode_float           encode_dict
     decode_number          encode_dict_key
@@ -17,3 +21,368 @@ to use during encoding.
 Although hooks can be quite powerful, they are not necessarily
 suitable for every situation.  You may need to perform some complex
 transformations outside of demjson.
+
+
+Simple example: decoding dates
+------------------------------
+
+Say you have some JSON document where all dates have been encoded as
+strings with the format "YYYY-MM-DD”.  You could use a hook function
+to automatically convert those strings into a Python date object.
+
+    import demjson, datetime, re
+    def date_converter( s ):
+        match = re.match( '^(\d{4})-(\d{2})-(\d{2})$', s )
+        if match:
+	    y, m, d = [int(n) for n in match.groups()]
+            return datetime.date( y, m, d )
+        else:
+            raise demjson.JSONSkipHook
+
+    demjson.decode( '{"birthdate": "1994-01-17"}' )
+         # gives => {'birthdate': '1994-01-17'}
+
+    demjson.decode( '{"birthdate": "1994-01-17"}',
+                    decode_string=date_converter )
+    # gives => {'birthdate': datetime.date(1994, 1, 17) }
+
+
+Simple example: encoding complex numbers
+----------------------------------------
+
+Say you are generating JSON but your Python object contains complex
+numbers.  You could use an encoding hook to transform them into a
+2-ary array.
+
+    import demjson
+    def complex_to_array( val ):
+        if isinstance( val, complex ):
+            return [ val.real, val.imag ]
+        else:
+            raise demjson.JSONSkipHook
+
+    demjson.encode( {'x': complex('3+9j')} )
+        # raises JSONEncodeError
+
+    demjson.encode( {'x': complex('3+9j')},
+                    encode_value=complex_to_array )
+        # gives => '{"x": [3.0, 9.0]}'
+
+
+Defining and setting hooks
+==========================
+
+A hook must be a callable function that takes a single argument,
+and either returns the same value, or some other value after a
+transformation.
+
+    # A sample user-defined hook function
+    def my_sort_array( arr ):
+        arr.sort()
+        return arr
+
+You can set hook functions either by calling the set_hook() method of
+the JSON class; or by passing an equivalent named argument to the
+encode() and decode() functions.
+
+If you are using the encode() or decode() functions, then your hooks
+are specified with named arguments:
+
+    demjson.decode( '[3,1,2]', decode_array=my_sort_array )
+        # gives => [1, 2, 3]
+
+If you are using the JSON class directly you need to call the
+set_hook() method with both the name of the hook and your function:
+
+    j = demjson.JSON()
+    j.set_hook( 'decode_array', my_sort_array )
+
+You can also clear a hook by specifying None as your function, or with
+the clear_hook() method.
+
+    j.set_hook( 'decode_array', None )
+    j.clear_hook( 'decode_array' )   # equivalent
+
+And to clear all hooks:
+
+    j.clear_all_hooks()
+
+
+Selective processing (Skipping)
+===============================
+
+When you specify a hook function, that function will be called for
+every matching object.  Many times though your hook may only want to
+perform a transformation on specific objects.  A hook function may
+therefore indicate that it does not wish to perform a transformation
+on a case-by-case basis.
+
+To do this, any hook function may raise a JSONSkipHook exception if it
+does not wish to handle a particular invocation.  This will have the
+effect of skipping the hook, for that particular value, as if the hook
+was net set.
+
+    # another sample hook function
+    def my_sum_arrays( arr ):
+        try:
+            return sum(arr)
+        except TypeError:
+            # Don't do anything
+            raise demjson.JSONSkipHook
+
+If you just 'return None', you are actually telling demjson to convert
+the value into None or null.
+
+Though some hooks allow you to just return the same value as passed
+with the same effect, be aware that not all hooks do so.  Therefore it
+is always recommended that you raise JSONSkipHook when intending to
+skip processing.
+
+
+Other important details when using hooks
+========================================
+
+Order of processing: Decoding hooks are generally called in
+a bottom-up order, whereas encoding hooks are called in a top-down
+order. This is discussed in more detail in the description of the
+hooks.
+
+Modifying values: The value that is passed to a hook function is not a
+deep copy.  If it is mutable and you make changes to it, and then
+raise a JSONSkipHook exception, the original value may not be
+preserved as expected.
+
+
+Exception handling
+==================
+
+If your hook function raises an exception, it will be caught and
+wrapped in a JSONDecodeHookError or JSONEncodeHookError.  Those are
+correspondingly subclasses of the JSONDecodeError and JSONEncodeError;
+so your outermost code only needs to catch one exception type.
+
+When running in Python 3 the standard Exception Chaining (PEP 3134)
+mechanism is employed.  Under Python 2 exception chaining is
+simulated, but a printed traceback of the original exception may not
+be printed. You can get to the original exception in the '__cause__'
+member of the outer exception.
+
+Consider the following example:
+
+    def my_encode_fractions( val ):
+        if 'numerator' in val and 'denominator' in val:
+            return d['numerator'] / d['denominator']  # OOPS. DIVIDE BY ZERO
+        else:
+            raise demjson.JSONSkipHook
+
+    demjson.encode( {'numerator':0, 'denominator':0},
+                    encode_dict=my_encode_fractions )
+
+For this example a divide by zero error will occur within the hook
+function.  The exception that eventually gets propagated out of the
+encode() call will be something like:
+
+    # ==== Exception printed Python 3:
+    Traceback (most recent call last):
+    ...
+    File "example.py", line 3, in my_encode_fractions
+    ZeroDivisionError: division by zero
+
+    The above exception was the direct cause of the following exception:
+
+    Traceback (most recent call last):
+    ...
+    File "..../demjson.py", line 9999, in call_hook
+    demjson.JSONEncodeHookError: Hook encode_dict raised
+              'ZeroDivisionError' while encoding type <dict>
+
+
+List of decoding hooks
+======================
+
+Decoding hooks let you intercept values during JSON parsing and
+perform additional translations. You could for example recognize
+strings with particular patterns and convert them into specific Python
+types.
+
+Decoding hooks are not given raw JSON, but instead fundamental
+python values that closely correspond to the original JSON text. So
+you don't need to worry, for instance, about Unicode surrogate pairs
+or other such complexities.
+
+When dealing with nested JSON data structures, objects and arrays,
+the decoding hooks are called bottom-up: the innermost value first
+working outward, and then left to right.
+
+
+The available hooks are:
+
+
+decode_string
+-------------
+    Called for every JSON string literal with the Python-equivalent
+    string value as an argument. Expects to get a Python object in
+    return.
+
+    Remember that the keys to JSON objects are also strings, and so
+    your hook should typically either return another string or some
+    type that is hashable.
+
+decode_float
+------------
+    Called for every JSON number that looks like a float (has a ".").
+    The string representation of the number is passed as an argument.
+    Expects to get a Python object in return.
+
+decode_number
+-------------
+    Called for every JSON number. The string representation of the
+    number is passed as an argument.  Expects to get a Python object
+    in return.  NOTE: If the number looks like a float and the
+    'decode_float' hook is set, then this hook will not be called.
+
+    Warning: If you are decoding in non-strict mode, then your number
+    decoding hook may also encounter so-called non-numbers.  You
+    should be prepared to handle any of 'NaN', 'Infinity',
+    '+Infinity', '-Infinity'. Or raise a 'JSONSkipHook' exception to
+    let demjson handle those values.
+
+decode_array
+------------
+     Called for every JSON array. A Python list is passed as
+     the argument, and expects to get a Python object back.
+     NOTE: this hook will get called for every array, even
+     for nested arrays.
+
+decode_object
+-------------
+     Called for every JSON object.  A Python dictionary is passed
+     as the argument, and expects to get a Python object back.
+     NOTE: this hook will get called for every object, even
+     for nested objects.
+
+
+List of encoding hooks
+======================
+
+Encoding hooks are used during JSON generation to let you intercept
+python values in the input and perform translations on them prior to
+encoding. You could for example convert complex numbers
+into a 2-valued array or a custom class instance into a dictionary.
+Remember that these hooks are not expected to output raw JSON, but
+instead a fundamental Python type which demjson already knows how to
+properly encode.
+
+When dealing with nested data structures, such as with dictionaries
+and lists, the encoding hooks are called top-down: the outermost value
+first working inward, and then from left to right.  This top-down
+order means that encoding hooks can be dangerous in that they can
+create infinite loops.
+
+
+The available hooks are:
+
+encode_value
+------------
+   Called for every Python object which is to be encoded into JSON.
+   This hook will get a chance to transform every value once,
+   regardless of it's type.  Most of the time this hook will probably
+   raise a 'JSONSkipHook', and only selectively return a
+   transformed value.
+
+   If the hook function returns a value that is generally of a
+   different kind, then the encoding process will run again. This
+   means that your returned value is subject to all the various hook
+   processing again.  Therefore careless coding of this hook function
+   can result in infinite loops.
+
+   This hook will be called before hook 'encode_dict_key'
+   for dictionary keys.
+
+encode_dict
+-----------
+
+   Called for every Python dictionary: any 'dict', 'UserDict',
+   'OrderedDict', or ChainMap; or any subclass of those.</p>
+
+   It will also be called for anything that is dictionary-like in that
+   it supports either of iterkeys() or keys() as well as
+   __getitem__(), so be aware in your hook function that the object
+   you receive may not support all the varied methods that the
+   standard dict does.
+
+   On recursion: if your hook function returns a dictionary, either
+   the same one possibly modified or anything else that looks like a
+   dictionary, then the result is immediately processed. This means
+   that your hook will _not_ be re-invoked on the new dictionary.
+   Though the contents of the returned dictionary will individually be
+   subject to their own hook processing.
+
+   However if your hook function returns any other kind of object
+   other than a dictionary then the encoding for that new object
+   starts over; which means that other hook functions may get
+   invoked.
+
+encode_dict_key
+---------------
+   Called for every dictionary key.  This allows you to transform non-string keys into
+   strings.  Note this will also be called even for keys that are already strings.
+
+   This hook is expected to return a string value.  However if running in non-strict
+   mode, it may also return a number, as ECMAScript allows numbers to be used as
+   object keys.
+
+   This hook will be called after the 'encode_value' hook.
+
+encode_sequence
+---------------
+   Called for every Python sequence-like object that is not a
+   dictionary or string.  This includes all 'list' and 'tuple' types
+   or their subtypes, or any other type that allows for basic
+   iteration.
+
+encode_bytes
+------------
+   PYTHON 3 ONLY.
+   Called for every Python 'bytes' or 'bytearray' type.  Additionally,
+   memory views (type 'memoryview') with an “unsigned byte” format
+   ('B') will converted to a normal 'bytes' type and passed to this
+   hook as well.  Memory view objects with different item formats are
+   treated as ordinary sequences (lists of numbers).
+
+   If this hook is not set then byte types are encoded as a sequence
+   (e.g., a list of numbers), or according to the 'encode_sequence'
+   hook.
+
+   One useful example is to compress and Base-64 encode any bytes value:
+
+       import demjson, bz2, base64
+
+       def my_bz2_and_base64_encoder( bytes_val ):
+           return base64.b64encode(
+                     bz2.compress( bytes_val ) ).decode('ascii')
+
+       data = open( "some_binary_file.dat", 'rb' ).read()  # Returns bytes type
+
+       demjson.encode( {'opaque': data},
+                       encode_bytes=my_bz2_and_base64_encoder )
+       # gives => '{"opaque": "QLEALFP ... N8WJ/tA=="}'
+
+   And if you replace 'b64encode' with 'b16encode' in the above, you
+   will hexadecimal-encode byte arrays.
+
+encode_default
+--------------
+
+   Called for any Python type which can not otherwise be converted
+   into JSON, even after applying any other encoding hooks.  A very
+   simple catch-all would be the built-in 'repr()' or 'str()'
+   functions, as in:
+
+       today = datetime.date.today()
+
+       demjson.encode( {"today": today}, encode_default=repr )
+       # gives =>  '{"today": "datetime.date(2014, 4, 22)"}'
+
+       demjson.encode( {"today": today}, encode_default=str )
+       # gives =>  '{"today": "2014-04-22"}'

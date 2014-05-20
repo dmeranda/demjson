@@ -75,7 +75,7 @@ DESCRIPTION
     
     When decoding strings with this module it may operate in either
     strict or non-strict mode.  The strict mode only allows syntax which
-    is conforming to RFC 7158 (JSON), while the non-strict allows much
+    is conforming to RFC 7159 (JSON), while the non-strict allows much
     more of the permissible ECMAScript syntax.
     
     The following are permitted when processing in NON-STRICT mode:
@@ -112,8 +112,8 @@ DESCRIPTION
     References:
        * JSON (JavaScript Object Notation)
          <http://json.org/>
-       * RFC 7158. The application/json Media Type for JavaScript Object Notation (JSON)
-         <http://www.ietf.org/rfc/rfc7158.txt>
+       * RFC 7159. The application/json Media Type for JavaScript Object Notation (JSON)
+         <http://www.ietf.org/rfc/rfc7159.txt>
        * ECMA-262 3rd edition (1999)
          <http://www.ecma-international.org/publications/files/ecma-st/ECMA-262.pdf>
        * IEEE 754-1985: Standard for Binary Floating-Point Arithmetic.
@@ -122,17 +122,26 @@ DESCRIPTION
 CLASSES
     __builtin__.object
         JSON
+        buffered_stream
+        decode_state
+        decode_statistics
+        encode_state
         helpers
+        json_options
         jsonlint
+        position_marker
     codecs.CodecInfo(__builtin__.tuple)
         utf32
     exceptions.Exception(exceptions.BaseException)
-        JSONError
-            JSONDecodeError
-                JSONDecodeHookError
-            JSONEncodeError
-                JSONEncodeHookError
-        JSONSkipHook
+        JSONException
+            JSONAbort
+            JSONError
+                JSONDecodeError
+                    JSONDecodeHookError
+                JSONEncodeError
+                    JSONEncodeHookError
+            JSONSkipHook
+            JSONStopProcessing
     
     class JSON(__builtin__.object)
      |  An encoder/decoder for JSON data streams.
@@ -147,55 +156,30 @@ CLASSES
      |  property of the object.
      |  
      |  You can also adjust a finer-grained control over strictness by
-     |  allowing or preventing specific behaviors.  You can get a list of
+     |  allowing or forbidding specific behaviors.  You can get a list of
      |  all the available behaviors by accessing the 'behaviors' property.
-     |  Likewise the allowed_behaviors and prevented_behaviors list which
+     |  Likewise the 'allowed_behaviors' and 'forbidden_behaviors' list which
      |  behaviors will be allowed and which will not.  Call the allow()
-     |  or prevent() methods to adjust these.
+     |  or forbid() methods to adjust these.
      |  
      |  Methods defined here:
      |  
-     |  __init__(self, strict=False, compactly=True, escape_unicode=False, encode_namedtuple_as_object=True)
+     |  __init__(self, **kwargs)
      |      Creates a JSON encoder/decoder object.
      |      
-     |      If 'strict' is set to True, then only strictly-conforming JSON
-     |      output will be produced.  Note that this means that some types
-     |      of values may not be convertable and will result in a
-     |      JSONEncodeError exception.
+     |      You may pass encoding and decoding options either by passing
+     |      an argument named 'json_options' with an instance of a
+     |      json_options class; or with individual keyword/values that will
+     |      be used to initialize a new json_options object.
      |      
-     |      If 'compactly' is set to True, then the resulting string will
-     |      have all extraneous white space removed; if False then the
-     |      string will be "pretty printed" with whitespace and indentation
-     |      added to make it more readable.
-     |      
-     |      If 'escape_unicode' is set to True, then all non-ASCII characters
-     |      will be represented as a unicode escape sequence; if False then
-     |      the actual real unicode character will be inserted if possible.
-     |      
-     |      The 'escape_unicode' can also be a function, which when called
-     |      with a single argument of a unicode character will return True
-     |      if the character should be escaped or False if it should not.
-     |      
-     |      If you wish to extend the encoding to ba able to handle
-     |      additional types, you may either:
-     |      
-     |            * subclass this class and override the encode_default()
-     |              method, or
-     |      
-     |            * set an 'encode_default' hook function (see set_hook())
-     |      
-     |      If 'encode_namedtuple_as_object' is True, then objects of type
-     |      namedtuple, or subclasses of 'tuple' that have an _asdict()
-     |      method, will be encoded as an object rather than an array.
+     |      You can also set hooks by using keyword arguments using the
+     |      hook name; e.g., encode_dict=my_hook_func.
      |  
-     |  allow(self, behavior)
-     |      Allow the specified behavior (turn off a strictness check).
+     |  call_hook(self, hook_name, input_object, position=None, *args, **kwargs)
+     |      Wrapper function to invoke a user-supplied hook function.
      |      
-     |      The list of all possible behaviors is available in the behaviors property.
-     |      You can see which behaviors are currently allowed by accessing the
-     |      allowed_behaviors property.
-     |  
-     |  call_hook(self, hook_name, *args, **kwargs)
+     |      This will capture any exceptions raised by the hook and do something
+     |      appropriate with it.
      |  
      |  clear_all_hooks(self)
      |      Unsets all hook callbacks, as previously set with set_hook().
@@ -203,20 +187,29 @@ CLASSES
      |  clear_hook(self, hookname)
      |      Unsets a hook callback, as previously set with set_hook().
      |  
-     |  decode(self, txt)
-     |      Decodes a JSON-endoded string into a Python object.
+     |  decode(self, txt, encoding=None, return_errors=False, return_stats=False)
+     |      Decodes a JSON-encoded string into a Python object.
+     |      
+     |      The 'return_errors' parameter controls what happens if the
+     |      input JSON has errors in it.
+     |      
+     |          * False: the first error will be raised as a Python
+     |            exception. If there are no errors then the corresponding
+     |            Python object will be returned.
+     |      
+     |          * True: the return value is always a 2-tuple: (object, error_list)
      |  
-     |  decode_boolean(self, s, i=0)
+     |  decode_boolean(self, state)
      |      Intermediate-level decode for JSON boolean literals.
      |      
      |      Takes a string and a starting index, and returns a Python bool
      |      (True or False) and the index of the next unparsed character.
      |  
-     |  decode_composite(self, txt, i=0, imax=None)
+     |  decode_composite(self, state)
      |      Intermediate-level JSON decoder for composite literal types (array and object).
-     |      
-     |      Takes text and a starting index, and returns either a Python list or
-     |      dictionary and the index of the next unparsed character.
+     |  
+     |  decode_identifier(self, state, identifier_as_string=False)
+     |      Decodes an identifier/keyword.
      |  
      |  decode_javascript_identifier(self, name)
      |      Convert a JavaScript identifier into a Python string object.
@@ -225,13 +218,13 @@ CLASSES
      |      identifiers are turned into Python objects.  By default this just
      |      converts them into strings.
      |  
-     |  decode_null(self, s, i=0)
+     |  decode_null(self, state)
      |      Intermediate-level decoder for ECMAScript 'null' keyword.
      |      
      |      Takes a string and a starting index, and returns a Python
      |      None object and the index of the next unparsed character.
      |  
-     |  decode_number(self, s, i=0, imax=None)
+     |  decode_number(self, state)
      |      Intermediate-level decoder for JSON numeric literals.
      |      
      |      Takes a string and a starting index, and returns a Python
@@ -244,23 +237,23 @@ CLASSES
      |      
      |      Ref. ECMAScript section 8.5.
      |  
-     |  decode_string(self, s, i=0, imax=None)
+     |  decode_string(self, state)
      |      Intermediate-level decoder for JSON string literals.
      |      
      |      Takes a string and a starting index, and returns a Python
      |      string (or unicode string) and the index of the next unparsed
      |      character.
      |  
-     |  decodeobj(self, txt, i=0, imax=None, identifier_as_string=False, only_object_or_array=False)
+     |  decodeobj(self, state, identifier_as_string=False, at_document_start=False)
      |      Intermediate-level JSON decoder.
      |      
      |      Takes a string and a starting index, and returns a two-tuple consting
      |      of a Python object and the index of the next unparsed character.
      |      
-     |      If there is no value at all (empty string, etc), the None is
+     |      If there is no value at all (empty string, etc), then None is
      |      returned instead of a tuple.
      |  
-     |  encode(self, obj, nest_level=0)
+     |  encode(self, obj, encoding=None)
      |      Encodes the Python object into a JSON string representation.
      |      
      |      This method will first attempt to encode an object by seeing
@@ -278,11 +271,11 @@ CLASSES
      |      by subclasses to provide a hook for extending the types which
      |      can be encoded.
      |  
-     |  encode_boolean(self, b)
+     |  encode_boolean(self, bval, state)
      |      Encodes the Python boolean into a JSON Boolean literal.
      |  
-     |  encode_composite(self, chunklist, obj, nest_level, obj_classification=None)
-     |      Encodes just dictionaries, lists, or sequences.
+     |  encode_composite(self, obj, state, obj_classification=None)
+     |      Encodes just composite objects: dictionaries, lists, or sequences.
      |      
      |      Basically handles any python type for which iter() can create
      |      an iterator object.
@@ -290,15 +283,14 @@ CLASSES
      |      This method is not intended to be called directly.  Use the
      |      encode() method instead.
      |  
-     |  encode_default(self, obj, nest_level=0)
-     |      DEPRECATED.
-     |      
-     |      This method is used to encode objects into JSON which are not straightforward.
-     |      
-     |      This method is intended to be overridden by subclasses which wish
-     |      to extend this encoder to handle additional types.
+     |  encode_date(self, dt, state)
      |  
-     |  encode_equivalent(self, obj, nest_level=0)
+     |  encode_datetime(self, dt, state)
+     |  
+     |  encode_enum(self, val, state)
+     |      Encode a Python Enum value into JSON.
+     |  
+     |  encode_equivalent(self, obj, state)
      |      This method is used to encode user-defined class objects.
      |      
      |      The object being encoded should have a json_equivalent()
@@ -312,12 +304,10 @@ CLASSES
      |      methods, then subclass this class and override this method
      |      to just return None.
      |  
-     |  encode_helper(self, chunklist, obj, nest_level)
-     |  
-     |  encode_null(self)
+     |  encode_null(self, state)
      |      Produces the JSON 'null' keyword.
      |  
-     |  encode_number(self, n)
+     |  encode_number(self, n, state)
      |      Encodes a Python numeric type into a JSON numeric literal.
      |      
      |      The special non-numeric values of float('nan'), float('inf')
@@ -327,10 +317,14 @@ CLASSES
      |      Note that Python complex types are not handled, as there is no
      |      ECMAScript equivalent type.
      |  
-     |  encode_string(self, s)
+     |  encode_string(self, s, state)
      |      Encodes a Python string into a JSON string literal.
      |  
-     |  encode_undefined(self)
+     |  encode_time(self, t, state)
+     |  
+     |  encode_timedelta(self, td, state)
+     |  
+     |  encode_undefined(self, state)
      |      Produces the ECMAScript 'undefined' keyword.
      |  
      |  has_hook(self, hook_name)
@@ -348,12 +342,8 @@ CLASSES
      |      
      |      Ref. ECMAScript section 7.2
      |  
-     |  prevent(self, behavior)
-     |      Prevent the specified behavior (turn on a strictness check).
-     |      
-     |      The list of all possible behaviors is available in the behaviors property.
-     |      You can see which behaviors are currently prevented by accessing the
-     |      prevented_behaviors property.
+     |  recover_parser(self, state)
+     |      Try to recover after a syntax error by locating the next "known" position.
      |  
      |  set_hook(self, hookname, function)
      |      Sets a user-defined callback function used during encoding or decoding.
@@ -429,25 +419,26 @@ CLASSES
      |          Called for any Python type which can not otherwise be converted
      |          into JSON, even after applying any other encoding hooks.
      |  
-     |  skip_comment(self, txt, i=0)
+     |  skip_comment(self, state)
      |      Skips an ECMAScript comment, either // or /* style.
      |      
      |      The contents of the comment are returned as a string, as well
      |      as the index of the character immediately after the comment.
      |  
-     |  skipws(self, txt, i=0, imax=None, skip_comments=True)
-     |      Skips whitespace.
-     |  
-     |  skipws_any(self, txt, i=0, imax=None, skip_comments=True)
+     |  skipws(self, state)
      |      Skips all whitespace, including comments and unicode whitespace
      |      
      |      Takes a string and a starting index, and returns the index of the
      |      next non-whitespace character.
      |      
-     |      If skip_comments is True and not running in strict JSON mode, then
-     |      comments will be skipped over just like whitespace.
+     |      If the 'skip_comments' behavior is True and not running in
+     |      strict JSON mode, then comments will be skipped over just like
+     |      whitespace.
      |  
-     |  try_encode_default(self, obj, nest_level=0)
+     |  skipws_nocomments(self, state)
+     |      Skips whitespace (will not allow comments).
+     |  
+     |  try_encode_default(self, obj, state)
      |  
      |  ----------------------------------------------------------------------
      |  Data descriptors defined here:
@@ -458,17 +449,9 @@ CLASSES
      |  __weakref__
      |      list of weak references to the object (if defined)
      |  
-     |  allowed_behaviors
-     |      List of known behaviors that are currently allowed
-     |  
-     |  behaviors
-     |      List of known behaviors that can be passed to allow() or prevent() methods
-     |  
-     |  prevented_behaviors
-     |      List of known behaviors that are currently prevented
-     |  
-     |  strict
-     |      True if adherence to RFC 7158 syntax is strict, or False is more generous ECMAScript syntax is permitted
+     |  options
+     |      The optional behaviors used, e.g., the JSON conformance
+     |      strictness.  Returns an instance of json_options.
      |  
      |  ----------------------------------------------------------------------
      |  Data and other attributes defined here:
@@ -477,22 +460,15 @@ CLASSES
      |  
      |  json_syntax_characters = u'{}[]"\\,:0123456789.-+abcdefghijklmnopqrstu...
     
-    class JSONDecodeError(JSONError)
-     |  An exception class raised when a JSON decoding error (syntax error) occurs.
-     |  
+    class JSONAbort(JSONException)
      |  Method resolution order:
-     |      JSONDecodeError
-     |      JSONError
+     |      JSONAbort
+     |      JSONException
      |      exceptions.Exception
      |      exceptions.BaseException
      |      __builtin__.object
      |  
-     |  Methods inherited from JSONError:
-     |  
-     |  pretty_description(self)
-     |  
-     |  ----------------------------------------------------------------------
-     |  Data descriptors inherited from JSONError:
+     |  Data descriptors inherited from JSONException:
      |  
      |  __weakref__
      |      list of weak references to the object (if defined)
@@ -530,6 +506,85 @@ CLASSES
      |  
      |  __repr__(...)
      |      x.__repr__() <==> repr(x)
+     |  
+     |  __setattr__(...)
+     |      x.__setattr__('name', value) <==> x.name = value
+     |  
+     |  __setstate__(...)
+     |  
+     |  __str__(...)
+     |      x.__str__() <==> str(x)
+     |  
+     |  __unicode__(...)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from exceptions.BaseException:
+     |  
+     |  __dict__
+     |  
+     |  args
+     |  
+     |  message
+    
+    class JSONDecodeError(JSONError)
+     |  An exception class raised when a JSON decoding error (syntax error) occurs.
+     |  
+     |  Method resolution order:
+     |      JSONDecodeError
+     |      JSONError
+     |      JSONException
+     |      exceptions.Exception
+     |      exceptions.BaseException
+     |      __builtin__.object
+     |  
+     |  Methods inherited from JSONError:
+     |  
+     |  __init__(self, message, *args, **kwargs)
+     |  
+     |  __repr__(self)
+     |  
+     |  pretty_description(self, show_positions=True, filename=None)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from JSONError:
+     |  
+     |  position
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes inherited from JSONError:
+     |  
+     |  severities = frozenset(['error', 'fatal', 'info', 'warning'])
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from JSONException:
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes inherited from exceptions.Exception:
+     |  
+     |  __new__ = <built-in method __new__ of type object>
+     |      T.__new__(S, ...) -> a new object with type S, a subtype of T
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from exceptions.BaseException:
+     |  
+     |  __delattr__(...)
+     |      x.__delattr__('name') <==> del x.name
+     |  
+     |  __getattribute__(...)
+     |      x.__getattribute__('name') <==> x.name
+     |  
+     |  __getitem__(...)
+     |      x.__getitem__(y) <==> x[y]
+     |  
+     |  __getslice__(...)
+     |      x.__getslice__(i, j) <==> x[i:j]
+     |      
+     |      Use of negative indices is not supported.
+     |  
+     |  __reduce__(...)
      |  
      |  __setattr__(...)
      |      x.__setattr__('name', value) <==> x.name = value
@@ -559,6 +614,7 @@ CLASSES
      |      JSONDecodeHookError
      |      JSONDecodeError
      |      JSONError
+     |      JSONException
      |      exceptions.Exception
      |      exceptions.BaseException
      |      __builtin__.object
@@ -570,10 +626,22 @@ CLASSES
      |  ----------------------------------------------------------------------
      |  Methods inherited from JSONError:
      |  
-     |  pretty_description(self)
+     |  __repr__(self)
+     |  
+     |  pretty_description(self, show_positions=True, filename=None)
      |  
      |  ----------------------------------------------------------------------
      |  Data descriptors inherited from JSONError:
+     |  
+     |  position
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes inherited from JSONError:
+     |  
+     |  severities = frozenset(['error', 'fatal', 'info', 'warning'])
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from JSONException:
      |  
      |  __weakref__
      |      list of weak references to the object (if defined)
@@ -602,9 +670,6 @@ CLASSES
      |      Use of negative indices is not supported.
      |  
      |  __reduce__(...)
-     |  
-     |  __repr__(...)
-     |      x.__repr__() <==> repr(x)
      |  
      |  __setattr__(...)
      |      x.__setattr__('name', value) <==> x.name = value
@@ -631,25 +696,34 @@ CLASSES
      |  Method resolution order:
      |      JSONEncodeError
      |      JSONError
+     |      JSONException
      |      exceptions.Exception
      |      exceptions.BaseException
      |      __builtin__.object
      |  
      |  Methods inherited from JSONError:
      |  
-     |  pretty_description(self)
+     |  __init__(self, message, *args, **kwargs)
+     |  
+     |  __repr__(self)
+     |  
+     |  pretty_description(self, show_positions=True, filename=None)
      |  
      |  ----------------------------------------------------------------------
      |  Data descriptors inherited from JSONError:
      |  
-     |  __weakref__
-     |      list of weak references to the object (if defined)
+     |  position
      |  
      |  ----------------------------------------------------------------------
-     |  Methods inherited from exceptions.Exception:
+     |  Data and other attributes inherited from JSONError:
      |  
-     |  __init__(...)
-     |      x.__init__(...) initializes x; see help(type(x)) for signature
+     |  severities = frozenset(['error', 'fatal', 'info', 'warning'])
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from JSONException:
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
      |  
      |  ----------------------------------------------------------------------
      |  Data and other attributes inherited from exceptions.Exception:
@@ -675,9 +749,6 @@ CLASSES
      |      Use of negative indices is not supported.
      |  
      |  __reduce__(...)
-     |  
-     |  __repr__(...)
-     |      x.__repr__() <==> repr(x)
      |  
      |  __setattr__(...)
      |      x.__setattr__('name', value) <==> x.name = value
@@ -707,6 +778,7 @@ CLASSES
      |      JSONEncodeHookError
      |      JSONEncodeError
      |      JSONError
+     |      JSONException
      |      exceptions.Exception
      |      exceptions.BaseException
      |      __builtin__.object
@@ -718,10 +790,22 @@ CLASSES
      |  ----------------------------------------------------------------------
      |  Methods inherited from JSONError:
      |  
-     |  pretty_description(self)
+     |  __repr__(self)
+     |  
+     |  pretty_description(self, show_positions=True, filename=None)
      |  
      |  ----------------------------------------------------------------------
      |  Data descriptors inherited from JSONError:
+     |  
+     |  position
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes inherited from JSONError:
+     |  
+     |  severities = frozenset(['error', 'fatal', 'info', 'warning'])
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from JSONException:
      |  
      |  __weakref__
      |      list of weak references to the object (if defined)
@@ -751,9 +835,6 @@ CLASSES
      |  
      |  __reduce__(...)
      |  
-     |  __repr__(...)
-     |      x.__repr__() <==> repr(x)
-     |  
      |  __setattr__(...)
      |      x.__setattr__('name', value) <==> x.name = value
      |  
@@ -773,30 +854,50 @@ CLASSES
      |  
      |  message
     
-    class JSONError(exceptions.Exception)
-     |  Our base class for all JSON-related errors.
+    class JSONError(JSONException)
+     |  Base class for all JSON-related errors.
+     |  
+     |  In addition to standard Python exceptions, these exceptions may
+     |  also have additional properties:
+     |  
+     |      * severity - One of: 'fatal', 'error', 'warning', 'info'
+     |      * position - An indication of the position in the input where the error occured.
+     |      * outer_position - A secondary position (optional) that gives
+     |        the location of the outer data item in which the error
+     |        occured, such as the beginning of a string or an array.
+     |      * context_description - A string that identifies the context
+     |        in which the error occured.  Default is "Context".
      |  
      |  Method resolution order:
      |      JSONError
+     |      JSONException
      |      exceptions.Exception
      |      exceptions.BaseException
      |      __builtin__.object
      |  
      |  Methods defined here:
      |  
-     |  pretty_description(self)
+     |  __init__(self, message, *args, **kwargs)
+     |  
+     |  __repr__(self)
+     |  
+     |  pretty_description(self, show_positions=True, filename=None)
      |  
      |  ----------------------------------------------------------------------
      |  Data descriptors defined here:
      |  
-     |  __weakref__
-     |      list of weak references to the object (if defined)
+     |  position
      |  
      |  ----------------------------------------------------------------------
-     |  Methods inherited from exceptions.Exception:
+     |  Data and other attributes defined here:
      |  
-     |  __init__(...)
-     |      x.__init__(...) initializes x; see help(type(x)) for signature
+     |  severities = frozenset(['error', 'fatal', 'info', 'warning'])
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from JSONException:
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
      |  
      |  ----------------------------------------------------------------------
      |  Data and other attributes inherited from exceptions.Exception:
@@ -823,9 +924,6 @@ CLASSES
      |  
      |  __reduce__(...)
      |  
-     |  __repr__(...)
-     |      x.__repr__() <==> repr(x)
-     |  
      |  __setattr__(...)
      |      x.__setattr__('name', value) <==> x.name = value
      |  
@@ -845,13 +943,11 @@ CLASSES
      |  
      |  message
     
-    class JSONSkipHook(exceptions.Exception)
-     |  An exception to be raised by user-defined code within hook
-     |  callbacks to indicate the callback does not want to handle the
-     |  situation.
+    class JSONException(exceptions.Exception)
+     |  Base class for all JSON-related exceptions.
      |  
      |  Method resolution order:
-     |      JSONSkipHook
+     |      JSONException
      |      exceptions.Exception
      |      exceptions.BaseException
      |      __builtin__.object
@@ -913,6 +1009,473 @@ CLASSES
      |  args
      |  
      |  message
+    
+    class JSONSkipHook(JSONException)
+     |  An exception to be raised by user-defined code within hook
+     |  callbacks to indicate the callback does not want to handle the
+     |  situation.
+     |  
+     |  Method resolution order:
+     |      JSONSkipHook
+     |      JSONException
+     |      exceptions.Exception
+     |      exceptions.BaseException
+     |      __builtin__.object
+     |  
+     |  Data descriptors inherited from JSONException:
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from exceptions.Exception:
+     |  
+     |  __init__(...)
+     |      x.__init__(...) initializes x; see help(type(x)) for signature
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes inherited from exceptions.Exception:
+     |  
+     |  __new__ = <built-in method __new__ of type object>
+     |      T.__new__(S, ...) -> a new object with type S, a subtype of T
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from exceptions.BaseException:
+     |  
+     |  __delattr__(...)
+     |      x.__delattr__('name') <==> del x.name
+     |  
+     |  __getattribute__(...)
+     |      x.__getattribute__('name') <==> x.name
+     |  
+     |  __getitem__(...)
+     |      x.__getitem__(y) <==> x[y]
+     |  
+     |  __getslice__(...)
+     |      x.__getslice__(i, j) <==> x[i:j]
+     |      
+     |      Use of negative indices is not supported.
+     |  
+     |  __reduce__(...)
+     |  
+     |  __repr__(...)
+     |      x.__repr__() <==> repr(x)
+     |  
+     |  __setattr__(...)
+     |      x.__setattr__('name', value) <==> x.name = value
+     |  
+     |  __setstate__(...)
+     |  
+     |  __str__(...)
+     |      x.__str__() <==> str(x)
+     |  
+     |  __unicode__(...)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from exceptions.BaseException:
+     |  
+     |  __dict__
+     |  
+     |  args
+     |  
+     |  message
+    
+    class JSONStopProcessing(JSONException)
+     |  Can be raised by anyplace, including inside a hook function, to
+     |  cause the entire encode or decode process to immediately stop
+     |  with an error.
+     |  
+     |  Method resolution order:
+     |      JSONStopProcessing
+     |      JSONException
+     |      exceptions.Exception
+     |      exceptions.BaseException
+     |      __builtin__.object
+     |  
+     |  Data descriptors inherited from JSONException:
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from exceptions.Exception:
+     |  
+     |  __init__(...)
+     |      x.__init__(...) initializes x; see help(type(x)) for signature
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes inherited from exceptions.Exception:
+     |  
+     |  __new__ = <built-in method __new__ of type object>
+     |      T.__new__(S, ...) -> a new object with type S, a subtype of T
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from exceptions.BaseException:
+     |  
+     |  __delattr__(...)
+     |      x.__delattr__('name') <==> del x.name
+     |  
+     |  __getattribute__(...)
+     |      x.__getattribute__('name') <==> x.name
+     |  
+     |  __getitem__(...)
+     |      x.__getitem__(y) <==> x[y]
+     |  
+     |  __getslice__(...)
+     |      x.__getslice__(i, j) <==> x[i:j]
+     |      
+     |      Use of negative indices is not supported.
+     |  
+     |  __reduce__(...)
+     |  
+     |  __repr__(...)
+     |      x.__repr__() <==> repr(x)
+     |  
+     |  __setattr__(...)
+     |      x.__setattr__('name', value) <==> x.name = value
+     |  
+     |  __setstate__(...)
+     |  
+     |  __str__(...)
+     |      x.__str__() <==> str(x)
+     |  
+     |  __unicode__(...)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from exceptions.BaseException:
+     |  
+     |  __dict__
+     |  
+     |  args
+     |  
+     |  message
+    
+    class buffered_stream(__builtin__.object)
+     |  A helper class for the JSON parser.
+     |  
+     |  It allows for reading an input document, while handling some
+     |  low-level Unicode issues as well as tracking the current position
+     |  in terms of line and column position.
+     |  
+     |  Methods defined here:
+     |  
+     |  __getitem__(self, index)
+     |      Returns the character at the given index relative to the current position.
+     |      
+     |      If the index goes beyond the end of the input, or prior to the
+     |      start when negative, then '' is returned.
+     |      
+     |      If the index provided is a slice object, then that range of
+     |      characters is returned as a string. Note that a stride value other
+     |      than 1 is not supported in the slice.  To use a slice, do:
+     |      
+     |          s = my_stream[ 1:4 ]
+     |  
+     |  __init__(self, txt='', encoding=None)
+     |  
+     |  __repr__(self)
+     |  
+     |  at_eol(self, allow_unicode_eol=True)
+     |      Returns True if the current position contains an
+     |      end-of-line control character.
+     |  
+     |  at_ws(self, allow_unicode_whitespace=True)
+     |      Returns True if the current position contains a white-space
+     |      character.
+     |  
+     |  clear_saved_position(self)
+     |  
+     |  peek(self, offset=0)
+     |      Returns the character at the current position, or at a
+     |      given offset away from the current position.  If the position
+     |      is beyond the limits of the document size, then an empty
+     |      string '' is returned.
+     |  
+     |  peekstr(self, span=1, offset=0)
+     |      Returns one or more characters starting at the current
+     |      position, or at a given offset away from the current position,
+     |      and continuing for the given span length.  If the offset and
+     |      span go outside the limit of the current document size, then
+     |      the returned string may be shorter than the requested span
+     |      length.
+     |  
+     |  pop(self)
+     |      Returns the character at the current position and advances
+     |      the position to the next character.  At the end of the
+     |      document this function returns an empty string.
+     |  
+     |  pop_identifier(self, match=None)
+     |      Pops the sequence of characters at the current position
+     |      that match the syntax for a JavaScript identifier.
+     |  
+     |  pop_if_startswith(self, s)
+     |      Pops the sequence of characters if they match the given string.
+     |      
+     |      See also method: startswith()
+     |  
+     |  pop_while_in(self, chars)
+     |      Pops a sequence of characters at the current position
+     |      as long as each of them is in the given set of characters.
+     |  
+     |  popif(self, testfn)
+     |      Just like the pop() function, but only returns the
+     |      character if the given predicate test function succeeds.
+     |  
+     |  popstr(self, span=1, offset=0)
+     |      Returns a string of one or more characters starting at the
+     |      current position, and advances the position to the following
+     |      character after the span.  Will not go beyond the end of the
+     |      document, so the returned string may be shorter than the
+     |      requested span.
+     |  
+     |  popuntil(self, testfn, maxchars=None)
+     |      Just like popwhile() method except the predicate function
+     |      should return True to stop the sequence rather than False.
+     |      
+     |      See also methods: skipuntil() and popwhile()
+     |  
+     |  popwhile(self, testfn, maxchars=None)
+     |      Pops all the characters starting at the current position as
+     |      long as each character passes the given predicate function
+     |      test.  If maxchars a numeric value instead of None then then
+     |      no more than that number of characters will be popped
+     |      regardless of the predicate test.
+     |      
+     |      See also methods: skipwhile() and popuntil()
+     |  
+     |  reset(self)
+     |      Clears the state to nothing.
+     |  
+     |  restore_position(self)
+     |  
+     |  rewind(self)
+     |      Resets the position back to the start of the input text.
+     |  
+     |  save_position(self)
+     |  
+     |  set_text(self, txt, encoding=None)
+     |      Changes the input text document and rewinds the position to
+     |      the start of the new document.
+     |  
+     |  skip(self, span=1)
+     |      Advances the current position by one (or the given number)
+     |      of characters.  Will not advance beyond the end of the
+     |      document.  Returns the number of characters skipped.
+     |  
+     |  skip_to_next_line(self, allow_unicode_eol=True)
+     |      Advances the current position to the start of the next
+     |      line.  Will not advance beyond the end of the file.  Note that
+     |      the two-character sequence CR+LF is recognized as being just a
+     |      single end-of-line marker.
+     |  
+     |  skipuntil(self, testfn)
+     |      Advances the current position until a given predicate test
+     |      function succeeds, or the end of the document is reached.
+     |      
+     |      Returns the actual number of characters skipped.
+     |      
+     |      The provided test function should take a single unicode
+     |      character and return a boolean value, such as:
+     |      
+     |          lambda c : c == '.'   # Skip to next period
+     |      
+     |      See also methods: skipwhile() and popuntil()
+     |  
+     |  skipwhile(self, testfn)
+     |      Advances the current position until a given predicate test
+     |      function fails, or the end of the document is reached.
+     |      
+     |      Returns the actual number of characters skipped.
+     |      
+     |      The provided test function should take a single unicode
+     |      character and return a boolean value, such as:
+     |      
+     |          lambda c : c.isdigit()   # Skip all digits
+     |      
+     |      See also methods: skipuntil() and popwhile()
+     |  
+     |  skipws(self, allow_unicode_whitespace=True)
+     |      Advances the current position past all whitespace, or until
+     |      the end of the document is reached.
+     |  
+     |  startswith(self, s)
+     |      Determines if the text at the current position starts with
+     |      the given string.
+     |      
+     |      See also method: pop_if_startswith()
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  at_end
+     |      Returns True if the position is currently at the end of the
+     |      document, of False otherwise.
+     |  
+     |  at_start
+     |      Returns True if the position is currently at the start of
+     |      the document, or False otherwise.
+     |  
+     |  bom
+     |      The Unicode Byte-Order Mark (BOM), if any, that was present
+     |      at the start of the input text.  The returned BOM is a string
+     |      of the raw bytes, and is not Unicode-decoded.
+     |  
+     |  codec
+     |      The codec object used to perform Unicode decoding, or None.
+     |  
+     |  cpos
+     |      The current character offset from the start of the document.
+     |  
+     |  position
+     |      The current position (as a position_marker object).
+     |      Returns a copy.
+     |  
+     |  text_context
+     |      A short human-readable textual excerpt of the document at
+     |      the current position, in English.
+    
+    class decode_state(__builtin__.object)
+     |  An internal transient object used during JSON decoding to
+     |  record the current parsing state and error messages.
+     |  
+     |  Methods defined here:
+     |  
+     |  __init__(self, options=None)
+     |  
+     |  push_cond(self, behavior_value, message, *args, **kwargs)
+     |      Creates an conditional error or warning message.
+     |      
+     |      The behavior value (from json_options) controls whether
+     |      a message will be pushed and whether it is an error
+     |      or warning message.
+     |  
+     |  push_error(self, message, *args, **kwargs)
+     |      Create an error.
+     |  
+     |  push_exception(self, exc)
+     |      Add an already-built exception to the error list.
+     |  
+     |  push_fatal(self, message, *args, **kwargs)
+     |      Create a fatal error.
+     |  
+     |  push_info(self, message, *args, **kwargs)
+     |      Create a informational message.
+     |  
+     |  push_warning(self, message, *args, **kwargs)
+     |      Create a warning.
+     |  
+     |  reset(self)
+     |      Clears all errors, statistics, and input text.
+     |  
+     |  set_input(self, txt, encoding=None)
+     |      Initialize the state by setting the input document text.
+     |  
+     |  update_depth_stats(self, **kwargs)
+     |  
+     |  update_float_stats(self, float_value, **kwargs)
+     |  
+     |  update_integer_stats(self, int_value, **kwargs)
+     |  
+     |  update_negzero_float_stats(self, **kwargs)
+     |  
+     |  update_negzero_int_stats(self, **kwargs)
+     |  
+     |  update_string_stats(self, s, **kwargs)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  has_errors
+     |      Have any errors been seen already?
+     |  
+     |  has_fatal
+     |      Have any errors been seen already?
+     |  
+     |  should_stop
+    
+    class decode_statistics(__builtin__.object)
+     |  An object that records various statistics about a decoded JSON document.
+     |  
+     |  Methods defined here:
+     |  
+     |  __init__(self)
+     |  
+     |  pretty_description(self, prefix='')
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |  
+     |  double_int_max = 9007199254740991
+     |  
+     |  double_int_min = -9007199254740991
+     |  
+     |  int16_max = 32767
+     |  
+     |  int16_min = -32768
+     |  
+     |  int32_max = 2147483647
+     |  
+     |  int32_min = -2147483648
+     |  
+     |  int64_max = 9223372036854775807
+     |  
+     |  int64_min = -9223372036854775808
+     |  
+     |  int8_max = 127
+     |  
+     |  int8_min = -128
+    
+    class encode_state(__builtin__.object)
+     |  An internal transient object used during JSON encoding to
+     |  record the current construction state.
+     |  
+     |  Methods defined here:
+     |  
+     |  __eq__(self, other_state)
+     |  
+     |  __init__(self, jsopts=None, parent=None)
+     |  
+     |  __lt__(self, other_state)
+     |  
+     |  append(self, s)
+     |      Adds a string to the end of the current JSON document
+     |  
+     |  combine(self)
+     |      Returns the accumulated string and resets the state to empty
+     |  
+     |  join_substate(self, other_state)
+     |  
+     |  make_substate(self)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
     
     class helpers(__builtin__.object)
      |  A set of utility functions.
@@ -923,18 +1486,6 @@ CLASSES
      |      Takes a string (or byte array) and tries to determine the Unicode encoding it is in.
      |      
      |      Returns the encoding name, as a string.
-     |  
-     |  auto_unicode_decode(s)
-     |      Takes a string (or byte array) and tries to convert it to a Unicode string.
-     |      
-     |      This will return a Python unicode string type corresponding to the
-     |      input string (either str or unicode).  The character encoding is
-     |      guessed by looking for either a Unicode BOM prefix, or by the
-     |      rules specified by RFC 7158.  When in doubt it is assumed the
-     |      input is encoded in UTF-8 (the default for JSON).
-     |      
-     |      The BOM (byte order mark) if present will be stripped off of the
-     |      returned string.
      |  
      |  char_is_identifier_leader(c)
      |      Determines if the character may be the first character of a
@@ -958,6 +1509,9 @@ CLASSES
      |  char_is_unicode_ws(c)
      |      Determines if the given character is a Unicode space character
      |  
+     |  decode_binary(binarystring)
+     |      Decodes a binary string into it's integer value.
+     |  
      |  decode_hex(hexstring)
      |      Decodes a hexadecimal string into it's integer value.
      |  
@@ -965,6 +1519,12 @@ CLASSES
      |      Decodes an octal string into it's integer value.
      |  
      |  extend_and_flatten_list_with_sep(orig_seq, extension_seq, separator='')
+     |  
+     |  format_timedelta_iso(td)
+     |      Encodes a datetime.timedelta into ISO-8601 Time Period format.
+     |  
+     |  is_binary_digit(c)
+     |      Determines if the given character is a valid binary digit (0 or 1).
      |  
      |  is_hex_digit(c)
      |      Determines if the given character is a valid hexadecimal digit (0-9, a-f, A-F).
@@ -1019,6 +1579,20 @@ CLASSES
      |      If the input character is inside the BMP then the output tuple will have
      |      just a single character...the same one.
      |  
+     |  unicode_decode(txt, encoding=None)
+     |      Takes a string (or byte array) and tries to convert it to a Unicode string.
+     |      
+     |      Returns a named tuple:  (string, codec, bom)
+     |      
+     |      The 'encoding' argument, if supplied, should either the name of
+     |      a character encoding, or an instance of codecs.CodecInfo.  If
+     |      the encoding argument is None or "auto" then the encoding is
+     |      automatically determined, if possible.
+     |      
+     |      Any BOM (Byte Order Mark) that is found at the beginning of the
+     |      input will be stripped off and placed in the 'bom' portion of
+     |      the returned value.
+     |  
      |  ----------------------------------------------------------------------
      |  Data descriptors defined here:
      |  
@@ -1035,9 +1609,712 @@ CLASSES
      |  
      |  hexdigits = '0123456789ABCDEFabcdef'
      |  
+     |  javascript_reserved_words = frozenset(['break', 'case', 'catch', 'clas...
+     |  
      |  octaldigits = '01234567'
      |  
      |  unsafe_string_chars = u'\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\x...
+    
+    class json_options(__builtin__.object)
+     |  Options to determine how strict the decoder or encoder should be.
+     |  
+     |  Methods defined here:
+     |  
+     |  __eq__ = behaviors_eq(self, other)
+     |      Determines if two options objects are equivalent.
+     |  
+     |  __init__(self, **kwargs)
+     |      Set JSON encoding and decoding options.
+     |      
+     |      If 'strict' is set to True, then only strictly-conforming JSON
+     |      output will be produced.  Note that this means that some types
+     |      of values may not be convertable and will result in a
+     |      JSONEncodeError exception.
+     |      
+     |      If 'compactly' is set to True, then the resulting string will
+     |      have all extraneous white space removed; if False then the
+     |      string will be "pretty printed" with whitespace and indentation
+     |      added to make it more readable.
+     |      
+     |      If 'escape_unicode' is set to True, then all non-ASCII characters
+     |      will be represented as a unicode escape sequence; if False then
+     |      the actual real unicode character will be inserted if possible.
+     |      
+     |      The 'escape_unicode' can also be a function, which when called
+     |      with a single argument of a unicode character will return True
+     |      if the character should be escaped or False if it should not.
+     |  
+     |  allow_all_numeric_signs(self, _name='all_numeric_signs', _value='allow')
+     |      Set behavior all_numeric_signs to allow.
+     |  
+     |  allow_any_type_at_start(self, _name='any_type_at_start', _value='allow')
+     |      Set behavior any_type_at_start to allow.
+     |  
+     |  allow_binary_numbers(self, _name='binary_numbers', _value='allow')
+     |      Set behavior binary_numbers to allow.
+     |  
+     |  allow_bom(self, _name='bom', _value='allow')
+     |      Set behavior bom to allow.
+     |  
+     |  allow_comments(self, _name='comments', _value='allow')
+     |      Set behavior comments to allow.
+     |  
+     |  allow_control_char_in_string(self, _name='control_char_in_string', _value='allow')
+     |      Set behavior control_char_in_string to allow.
+     |  
+     |  allow_duplicate_keys(self, _name='duplicate_keys', _value='allow')
+     |      Set behavior duplicate_keys to allow.
+     |  
+     |  allow_extended_unicode_escapes(self, _name='extended_unicode_escapes', _value='allow')
+     |      Set behavior extended_unicode_escapes to allow.
+     |  
+     |  allow_format_control_chars(self, _name='format_control_chars', _value='allow')
+     |      Set behavior format_control_chars to allow.
+     |  
+     |  allow_hex_numbers(self, _name='hex_numbers', _value='allow')
+     |      Set behavior hex_numbers to allow.
+     |  
+     |  allow_identifier_keys(self, _name='identifier_keys', _value='allow')
+     |      Set behavior identifier_keys to allow.
+     |  
+     |  allow_initial_decimal_point(self, _name='initial_decimal_point', _value='allow')
+     |      Set behavior initial_decimal_point to allow.
+     |  
+     |  allow_js_string_escapes(self, _name='js_string_escapes', _value='allow')
+     |      Set behavior js_string_escapes to allow.
+     |  
+     |  allow_leading_zeros(self, _name='leading_zeros', _value='allow')
+     |      Set behavior leading_zeros to allow.
+     |  
+     |  allow_non_numbers(self, _name='non_numbers', _value='allow')
+     |      Set behavior non_numbers to allow.
+     |  
+     |  allow_non_portable(self, _name='non_portable', _value='allow')
+     |      Set behavior non_portable to allow.
+     |  
+     |  allow_nonescape_characters(self, _name='nonescape_characters', _value='allow')
+     |      Set behavior nonescape_characters to allow.
+     |  
+     |  allow_nonstring_keys(self, _name='nonstring_keys', _value='allow')
+     |      Set behavior nonstring_keys to allow.
+     |  
+     |  allow_octal_numbers(self, _name='octal_numbers', _value='allow')
+     |      Set behavior octal_numbers to allow.
+     |  
+     |  allow_omitted_array_elements(self, _name='omitted_array_elements', _value='allow')
+     |      Set behavior omitted_array_elements to allow.
+     |  
+     |  allow_single_quoted_strings(self, _name='single_quoted_strings', _value='allow')
+     |      Set behavior single_quoted_strings to allow.
+     |  
+     |  allow_trailing_comma(self, _name='trailing_comma', _value='allow')
+     |      Set behavior trailing_comma to allow.
+     |  
+     |  allow_trailing_decimal_point(self, _name='trailing_decimal_point', _value='allow')
+     |      Set behavior trailing_decimal_point to allow.
+     |  
+     |  allow_undefined_values(self, _name='undefined_values', _value='allow')
+     |      Set behavior undefined_values to allow.
+     |  
+     |  allow_unicode_whitespace(self, _name='unicode_whitespace', _value='allow')
+     |      Set behavior unicode_whitespace to allow.
+     |  
+     |  allow_zero_byte(self, _name='zero_byte', _value='allow')
+     |      Set behavior zero_byte to allow.
+     |  
+     |  copy(self)
+     |  
+     |  copy_from(self, other)
+     |  
+     |  describe_behavior(self, name)
+     |      Returns documentation about a given behavior.
+     |  
+     |  forbid_all_numeric_signs(self, _name='all_numeric_signs', _value='forbid')
+     |      Set behavior all_numeric_signs to forbid.
+     |  
+     |  forbid_any_type_at_start(self, _name='any_type_at_start', _value='forbid')
+     |      Set behavior any_type_at_start to forbid.
+     |  
+     |  forbid_binary_numbers(self, _name='binary_numbers', _value='forbid')
+     |      Set behavior binary_numbers to forbid.
+     |  
+     |  forbid_bom(self, _name='bom', _value='forbid')
+     |      Set behavior bom to forbid.
+     |  
+     |  forbid_comments(self, _name='comments', _value='forbid')
+     |      Set behavior comments to forbid.
+     |  
+     |  forbid_control_char_in_string(self, _name='control_char_in_string', _value='forbid')
+     |      Set behavior control_char_in_string to forbid.
+     |  
+     |  forbid_duplicate_keys(self, _name='duplicate_keys', _value='forbid')
+     |      Set behavior duplicate_keys to forbid.
+     |  
+     |  forbid_extended_unicode_escapes(self, _name='extended_unicode_escapes', _value='forbid')
+     |      Set behavior extended_unicode_escapes to forbid.
+     |  
+     |  forbid_format_control_chars(self, _name='format_control_chars', _value='forbid')
+     |      Set behavior format_control_chars to forbid.
+     |  
+     |  forbid_hex_numbers(self, _name='hex_numbers', _value='forbid')
+     |      Set behavior hex_numbers to forbid.
+     |  
+     |  forbid_identifier_keys(self, _name='identifier_keys', _value='forbid')
+     |      Set behavior identifier_keys to forbid.
+     |  
+     |  forbid_initial_decimal_point(self, _name='initial_decimal_point', _value='forbid')
+     |      Set behavior initial_decimal_point to forbid.
+     |  
+     |  forbid_js_string_escapes(self, _name='js_string_escapes', _value='forbid')
+     |      Set behavior js_string_escapes to forbid.
+     |  
+     |  forbid_leading_zeros(self, _name='leading_zeros', _value='forbid')
+     |      Set behavior leading_zeros to forbid.
+     |  
+     |  forbid_non_numbers(self, _name='non_numbers', _value='forbid')
+     |      Set behavior non_numbers to forbid.
+     |  
+     |  forbid_non_portable(self, _name='non_portable', _value='forbid')
+     |      Set behavior non_portable to forbid.
+     |  
+     |  forbid_nonescape_characters(self, _name='nonescape_characters', _value='forbid')
+     |      Set behavior nonescape_characters to forbid.
+     |  
+     |  forbid_nonstring_keys(self, _name='nonstring_keys', _value='forbid')
+     |      Set behavior nonstring_keys to forbid.
+     |  
+     |  forbid_octal_numbers(self, _name='octal_numbers', _value='forbid')
+     |      Set behavior octal_numbers to forbid.
+     |  
+     |  forbid_omitted_array_elements(self, _name='omitted_array_elements', _value='forbid')
+     |      Set behavior omitted_array_elements to forbid.
+     |  
+     |  forbid_single_quoted_strings(self, _name='single_quoted_strings', _value='forbid')
+     |      Set behavior single_quoted_strings to forbid.
+     |  
+     |  forbid_trailing_comma(self, _name='trailing_comma', _value='forbid')
+     |      Set behavior trailing_comma to forbid.
+     |  
+     |  forbid_trailing_decimal_point(self, _name='trailing_decimal_point', _value='forbid')
+     |      Set behavior trailing_decimal_point to forbid.
+     |  
+     |  forbid_undefined_values(self, _name='undefined_values', _value='forbid')
+     |      Set behavior undefined_values to forbid.
+     |  
+     |  forbid_unicode_whitespace(self, _name='unicode_whitespace', _value='forbid')
+     |      Set behavior unicode_whitespace to forbid.
+     |  
+     |  forbid_zero_byte(self, _name='zero_byte', _value='forbid')
+     |      Set behavior zero_byte to forbid.
+     |  
+     |  get_behavior(self, name)
+     |      Returns the value for a given behavior
+     |  
+     |  indentation_for_level(self, level=0)
+     |      Returns a whitespace string used for indenting.
+     |  
+     |  is_all(self, value)
+     |      Determines if all the behaviors have the given value.
+     |  
+     |  reset_to_defaults(self)
+     |  
+     |  set_all(self, value)
+     |      Changes all behaviors to have the given value.
+     |  
+     |  set_all_allow(self, _value='allow')
+     |      Set all behaviors to value allow.
+     |  
+     |  set_all_forbid(self, _value='forbid')
+     |      Set all behaviors to value forbid.
+     |  
+     |  set_all_warn(self, _value='warn')
+     |      Set all behaviors to value warn.
+     |  
+     |  set_behavior(self, name, value)
+     |      Changes the value for a given behavior
+     |  
+     |  set_indent(self, num_spaces, tab_width=0, limit=None)
+     |      Changes the indentation properties when outputting JSON in non-compact mode.
+     |      
+     |      'num_spaces' is the number of spaces to insert for each level
+     |      of indentation, which defaults to 2.
+     |      
+     |      'tab_width', if not 0, is the number of spaces which is equivalent
+     |      to one tab character.  Tabs will be output where possible rather
+     |      than runs of spaces.
+     |      
+     |      'limit', if not None, is the maximum indentation level after
+     |      which no further indentation will be output.
+     |  
+     |  spaces_to_next_indent_level(self, min_spaces=1, subtract=0)
+     |  
+     |  suppress_warnings(self)
+     |  
+     |  warn_all_numeric_signs(self, _name='all_numeric_signs', _value='warn')
+     |      Set behavior all_numeric_signs to warn.
+     |  
+     |  warn_any_type_at_start(self, _name='any_type_at_start', _value='warn')
+     |      Set behavior any_type_at_start to warn.
+     |  
+     |  warn_binary_numbers(self, _name='binary_numbers', _value='warn')
+     |      Set behavior binary_numbers to warn.
+     |  
+     |  warn_bom(self, _name='bom', _value='warn')
+     |      Set behavior bom to warn.
+     |  
+     |  warn_comments(self, _name='comments', _value='warn')
+     |      Set behavior comments to warn.
+     |  
+     |  warn_control_char_in_string(self, _name='control_char_in_string', _value='warn')
+     |      Set behavior control_char_in_string to warn.
+     |  
+     |  warn_duplicate_keys(self, _name='duplicate_keys', _value='warn')
+     |      Set behavior duplicate_keys to warn.
+     |  
+     |  warn_extended_unicode_escapes(self, _name='extended_unicode_escapes', _value='warn')
+     |      Set behavior extended_unicode_escapes to warn.
+     |  
+     |  warn_format_control_chars(self, _name='format_control_chars', _value='warn')
+     |      Set behavior format_control_chars to warn.
+     |  
+     |  warn_hex_numbers(self, _name='hex_numbers', _value='warn')
+     |      Set behavior hex_numbers to warn.
+     |  
+     |  warn_identifier_keys(self, _name='identifier_keys', _value='warn')
+     |      Set behavior identifier_keys to warn.
+     |  
+     |  warn_initial_decimal_point(self, _name='initial_decimal_point', _value='warn')
+     |      Set behavior initial_decimal_point to warn.
+     |  
+     |  warn_js_string_escapes(self, _name='js_string_escapes', _value='warn')
+     |      Set behavior js_string_escapes to warn.
+     |  
+     |  warn_leading_zeros(self, _name='leading_zeros', _value='warn')
+     |      Set behavior leading_zeros to warn.
+     |  
+     |  warn_non_numbers(self, _name='non_numbers', _value='warn')
+     |      Set behavior non_numbers to warn.
+     |  
+     |  warn_non_portable(self, _name='non_portable', _value='warn')
+     |      Set behavior non_portable to warn.
+     |  
+     |  warn_nonescape_characters(self, _name='nonescape_characters', _value='warn')
+     |      Set behavior nonescape_characters to warn.
+     |  
+     |  warn_nonstring_keys(self, _name='nonstring_keys', _value='warn')
+     |      Set behavior nonstring_keys to warn.
+     |  
+     |  warn_octal_numbers(self, _name='octal_numbers', _value='warn')
+     |      Set behavior octal_numbers to warn.
+     |  
+     |  warn_omitted_array_elements(self, _name='omitted_array_elements', _value='warn')
+     |      Set behavior omitted_array_elements to warn.
+     |  
+     |  warn_single_quoted_strings(self, _name='single_quoted_strings', _value='warn')
+     |      Set behavior single_quoted_strings to warn.
+     |  
+     |  warn_trailing_comma(self, _name='trailing_comma', _value='warn')
+     |      Set behavior trailing_comma to warn.
+     |  
+     |  warn_trailing_decimal_point(self, _name='trailing_decimal_point', _value='warn')
+     |      Set behavior trailing_decimal_point to warn.
+     |  
+     |  warn_undefined_values(self, _name='undefined_values', _value='warn')
+     |      Set behavior undefined_values to warn.
+     |  
+     |  warn_unicode_whitespace(self, _name='unicode_whitespace', _value='warn')
+     |      Set behavior unicode_whitespace to warn.
+     |  
+     |  warn_zero_byte(self, _name='zero_byte', _value='warn')
+     |      Set behavior zero_byte to warn.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  all_behaviors
+     |      Returns the names of all known behaviors.
+     |  
+     |  all_numeric_signs
+     |      Numbers may be prefixed by any '+' and '-', e.g., +4, -+-+77
+     |  
+     |  allow_behaviors
+     |      Return the set of behaviors with the value allow.
+     |  
+     |  allow_or_warn_behaviors
+     |      Returns the set of all behaviors that are not forbidden (i.e., are allowed or warned).
+     |  
+     |  any_type_at_start
+     |      A JSON document may start with any type, not just arrays or objects
+     |  
+     |  binary_numbers
+     |      Binary numbers, e.g., 0b1001
+     |  
+     |  bom
+     |      A JSON document may start with a Unicode BOM (Byte Order Mark)
+     |  
+     |  comments
+     |      JavaScript comments, both /*...*/ and //... styles
+     |  
+     |  control_char_in_string
+     |      Strings may contain raw control characters without \u-escaping
+     |  
+     |  duplicate_keys
+     |      Objects may have repeated keys
+     |  
+     |  encode_enum_as
+     |      The strategy for encoding Python Enum values.
+     |  
+     |  extended_unicode_escapes
+     |      Extended Unicode escape sequence \u{..} for non-BMP characters
+     |  
+     |  forbid_behaviors
+     |      Return the set of behaviors with the value forbid.
+     |  
+     |  format_control_chars
+     |      Unicode "format control characters" may appear in the input
+     |  
+     |  hex_numbers
+     |      Hexadecimal numbers, e.g., 0x1f
+     |  
+     |  identifier_keys
+     |      JavaScript identifiers are converted to strings when used as object keys
+     |  
+     |  initial_decimal_point
+     |      Floating-point numbers may start with a decimal point (no units digit)
+     |  
+     |  is_all_allow
+     |      Determines if all the behaviors have the value allow.
+     |  
+     |  is_all_forbid
+     |      Determines if all the behaviors have the value forbid.
+     |  
+     |  is_all_warn
+     |      Determines if all the behaviors have the value warn.
+     |  
+     |  is_allow_all_numeric_signs
+     |      Allow Numbers may be prefixed by any '+' and '-', e.g., +4, -+-+77
+     |  
+     |  is_allow_any_type_at_start
+     |      Allow A JSON document may start with any type, not just arrays or objects
+     |  
+     |  is_allow_binary_numbers
+     |      Allow Binary numbers, e.g., 0b1001
+     |  
+     |  is_allow_bom
+     |      Allow A JSON document may start with a Unicode BOM (Byte Order Mark)
+     |  
+     |  is_allow_comments
+     |      Allow JavaScript comments, both /*...*/ and //... styles
+     |  
+     |  is_allow_control_char_in_string
+     |      Allow Strings may contain raw control characters without \u-escaping
+     |  
+     |  is_allow_duplicate_keys
+     |      Allow Objects may have repeated keys
+     |  
+     |  is_allow_extended_unicode_escapes
+     |      Allow Extended Unicode escape sequence \u{..} for non-BMP characters
+     |  
+     |  is_allow_format_control_chars
+     |      Allow Unicode "format control characters" may appear in the input
+     |  
+     |  is_allow_hex_numbers
+     |      Allow Hexadecimal numbers, e.g., 0x1f
+     |  
+     |  is_allow_identifier_keys
+     |      Allow JavaScript identifiers are converted to strings when used as object keys
+     |  
+     |  is_allow_initial_decimal_point
+     |      Allow Floating-point numbers may start with a decimal point (no units digit)
+     |  
+     |  is_allow_js_string_escapes
+     |      Allow All JavaScript character \-escape sequences may be in strings
+     |  
+     |  is_allow_leading_zeros
+     |      Allow Numbers may have leading zeros
+     |  
+     |  is_allow_non_numbers
+     |      Allow Non-numbers may be used, such as NaN or Infinity
+     |  
+     |  is_allow_non_portable
+     |      Allow Anything technically valid but likely to cause data portablibity issues
+     |  
+     |  is_allow_nonescape_characters
+     |      Allow Unknown character \-escape sequences stand for that character (\Q -> 'Q')
+     |  
+     |  is_allow_nonstring_keys
+     |      Allow Value types other than strings (or identifiers) may be used as object keys
+     |  
+     |  is_allow_octal_numbers
+     |      Allow New-style octal numbers, e.g., 0o731  (see leading-zeros for legacy octals)
+     |  
+     |  is_allow_omitted_array_elements
+     |      Allow Arrays may have omitted/elided elements, e.g., [1,,3] == [1,undefined,3]
+     |  
+     |  is_allow_single_quoted_strings
+     |      Allow Strings may be delimited with both double (") and single (') quotation marks
+     |  
+     |  is_allow_trailing_comma
+     |      Allow A final comma may end the list of array or object members
+     |  
+     |  is_allow_trailing_decimal_point
+     |      Allow Floating-point number may end with a decimal point and no following fractional digits
+     |  
+     |  is_allow_undefined_values
+     |      Allow The JavaScript 'undefined' value may be used
+     |  
+     |  is_allow_unicode_whitespace
+     |      Allow Treat any Unicode whitespace character as valid whitespace
+     |  
+     |  is_allow_zero_byte
+     |      Allow Strings may contain U+0000, which may not be safe for C-based programs
+     |  
+     |  is_forbid_all_numeric_signs
+     |      Forbid Numbers may be prefixed by any '+' and '-', e.g., +4, -+-+77
+     |  
+     |  is_forbid_any_type_at_start
+     |      Forbid A JSON document may start with any type, not just arrays or objects
+     |  
+     |  is_forbid_binary_numbers
+     |      Forbid Binary numbers, e.g., 0b1001
+     |  
+     |  is_forbid_bom
+     |      Forbid A JSON document may start with a Unicode BOM (Byte Order Mark)
+     |  
+     |  is_forbid_comments
+     |      Forbid JavaScript comments, both /*...*/ and //... styles
+     |  
+     |  is_forbid_control_char_in_string
+     |      Forbid Strings may contain raw control characters without \u-escaping
+     |  
+     |  is_forbid_duplicate_keys
+     |      Forbid Objects may have repeated keys
+     |  
+     |  is_forbid_extended_unicode_escapes
+     |      Forbid Extended Unicode escape sequence \u{..} for non-BMP characters
+     |  
+     |  is_forbid_format_control_chars
+     |      Forbid Unicode "format control characters" may appear in the input
+     |  
+     |  is_forbid_hex_numbers
+     |      Forbid Hexadecimal numbers, e.g., 0x1f
+     |  
+     |  is_forbid_identifier_keys
+     |      Forbid JavaScript identifiers are converted to strings when used as object keys
+     |  
+     |  is_forbid_initial_decimal_point
+     |      Forbid Floating-point numbers may start with a decimal point (no units digit)
+     |  
+     |  is_forbid_js_string_escapes
+     |      Forbid All JavaScript character \-escape sequences may be in strings
+     |  
+     |  is_forbid_leading_zeros
+     |      Forbid Numbers may have leading zeros
+     |  
+     |  is_forbid_non_numbers
+     |      Forbid Non-numbers may be used, such as NaN or Infinity
+     |  
+     |  is_forbid_non_portable
+     |      Forbid Anything technically valid but likely to cause data portablibity issues
+     |  
+     |  is_forbid_nonescape_characters
+     |      Forbid Unknown character \-escape sequences stand for that character (\Q -> 'Q')
+     |  
+     |  is_forbid_nonstring_keys
+     |      Forbid Value types other than strings (or identifiers) may be used as object keys
+     |  
+     |  is_forbid_octal_numbers
+     |      Forbid New-style octal numbers, e.g., 0o731  (see leading-zeros for legacy octals)
+     |  
+     |  is_forbid_omitted_array_elements
+     |      Forbid Arrays may have omitted/elided elements, e.g., [1,,3] == [1,undefined,3]
+     |  
+     |  is_forbid_single_quoted_strings
+     |      Forbid Strings may be delimited with both double (") and single (') quotation marks
+     |  
+     |  is_forbid_trailing_comma
+     |      Forbid A final comma may end the list of array or object members
+     |  
+     |  is_forbid_trailing_decimal_point
+     |      Forbid Floating-point number may end with a decimal point and no following fractional digits
+     |  
+     |  is_forbid_undefined_values
+     |      Forbid The JavaScript 'undefined' value may be used
+     |  
+     |  is_forbid_unicode_whitespace
+     |      Forbid Treat any Unicode whitespace character as valid whitespace
+     |  
+     |  is_forbid_zero_byte
+     |      Forbid Strings may contain U+0000, which may not be safe for C-based programs
+     |  
+     |  is_warn_all_numeric_signs
+     |      Warn Numbers may be prefixed by any '+' and '-', e.g., +4, -+-+77
+     |  
+     |  is_warn_any_type_at_start
+     |      Warn A JSON document may start with any type, not just arrays or objects
+     |  
+     |  is_warn_binary_numbers
+     |      Warn Binary numbers, e.g., 0b1001
+     |  
+     |  is_warn_bom
+     |      Warn A JSON document may start with a Unicode BOM (Byte Order Mark)
+     |  
+     |  is_warn_comments
+     |      Warn JavaScript comments, both /*...*/ and //... styles
+     |  
+     |  is_warn_control_char_in_string
+     |      Warn Strings may contain raw control characters without \u-escaping
+     |  
+     |  is_warn_duplicate_keys
+     |      Warn Objects may have repeated keys
+     |  
+     |  is_warn_extended_unicode_escapes
+     |      Warn Extended Unicode escape sequence \u{..} for non-BMP characters
+     |  
+     |  is_warn_format_control_chars
+     |      Warn Unicode "format control characters" may appear in the input
+     |  
+     |  is_warn_hex_numbers
+     |      Warn Hexadecimal numbers, e.g., 0x1f
+     |  
+     |  is_warn_identifier_keys
+     |      Warn JavaScript identifiers are converted to strings when used as object keys
+     |  
+     |  is_warn_initial_decimal_point
+     |      Warn Floating-point numbers may start with a decimal point (no units digit)
+     |  
+     |  is_warn_js_string_escapes
+     |      Warn All JavaScript character \-escape sequences may be in strings
+     |  
+     |  is_warn_leading_zeros
+     |      Warn Numbers may have leading zeros
+     |  
+     |  is_warn_non_numbers
+     |      Warn Non-numbers may be used, such as NaN or Infinity
+     |  
+     |  is_warn_non_portable
+     |      Warn Anything technically valid but likely to cause data portablibity issues
+     |  
+     |  is_warn_nonescape_characters
+     |      Warn Unknown character \-escape sequences stand for that character (\Q -> 'Q')
+     |  
+     |  is_warn_nonstring_keys
+     |      Warn Value types other than strings (or identifiers) may be used as object keys
+     |  
+     |  is_warn_octal_numbers
+     |      Warn New-style octal numbers, e.g., 0o731  (see leading-zeros for legacy octals)
+     |  
+     |  is_warn_omitted_array_elements
+     |      Warn Arrays may have omitted/elided elements, e.g., [1,,3] == [1,undefined,3]
+     |  
+     |  is_warn_single_quoted_strings
+     |      Warn Strings may be delimited with both double (") and single (') quotation marks
+     |  
+     |  is_warn_trailing_comma
+     |      Warn A final comma may end the list of array or object members
+     |  
+     |  is_warn_trailing_decimal_point
+     |      Warn Floating-point number may end with a decimal point and no following fractional digits
+     |  
+     |  is_warn_undefined_values
+     |      Warn The JavaScript 'undefined' value may be used
+     |  
+     |  is_warn_unicode_whitespace
+     |      Warn Treat any Unicode whitespace character as valid whitespace
+     |  
+     |  is_warn_zero_byte
+     |      Warn Strings may contain U+0000, which may not be safe for C-based programs
+     |  
+     |  js_string_escapes
+     |      All JavaScript character \-escape sequences may be in strings
+     |  
+     |  leading_zero_radix
+     |      The radix to be used for numbers with leading zeros.  8 or 10
+     |  
+     |  leading_zero_radix_as_word
+     |  
+     |  leading_zeros
+     |      Numbers may have leading zeros
+     |  
+     |  non_numbers
+     |      Non-numbers may be used, such as NaN or Infinity
+     |  
+     |  non_portable
+     |      Anything technically valid but likely to cause data portablibity issues
+     |  
+     |  nonescape_characters
+     |      Unknown character \-escape sequences stand for that character (\Q -> 'Q')
+     |  
+     |  nonstring_keys
+     |      Value types other than strings (or identifiers) may be used as object keys
+     |  
+     |  octal_numbers
+     |      New-style octal numbers, e.g., 0o731  (see leading-zeros for legacy octals)
+     |  
+     |  omitted_array_elements
+     |      Arrays may have omitted/elided elements, e.g., [1,,3] == [1,undefined,3]
+     |  
+     |  single_quoted_strings
+     |      Strings may be delimited with both double (") and single (') quotation marks
+     |  
+     |  sort_keys
+     |      The method used to sort dictionary keys when encoding JSON
+     |  
+     |  strictness
+     |  
+     |  trailing_comma
+     |      A final comma may end the list of array or object members
+     |  
+     |  trailing_decimal_point
+     |      Floating-point number may end with a decimal point and no following fractional digits
+     |  
+     |  undefined_values
+     |      The JavaScript 'undefined' value may be used
+     |  
+     |  unicode_whitespace
+     |      Treat any Unicode whitespace character as valid whitespace
+     |  
+     |  values
+     |      Set of possible behavior values
+     |  
+     |  warn_behaviors
+     |      Return the set of behaviors with the value warn.
+     |  
+     |  zero_byte
+     |      Strings may contain U+0000, which may not be safe for C-based programs
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |  
+     |  __metaclass__ = <class 'demjson._behaviors_metaclass'>
+     |      Meta class used to establish a set of "behavior" options.
+     |      
+     |      Classes that use this meta class must defined a class-level
+     |      variable called '_behaviors' that is a list of tuples, each of
+     |      which describes one behavior and is like: (behavior_name,
+     |      documentation).  Also define a second class-level variable called
+     |      '_behavior_values' which is a list of the permitted values for
+     |      each behavior, each being strings.
+     |      
+     |      For each behavior (e.g., pretty), and for each value (e.g.,
+     |      yes) the following methods/properties will be created:
+     |      
+     |        * pretty - value of 'pretty' behavior (read-write)
+     |        * ispretty_yes - returns True if 'pretty' is 'yes'
+     |      
+     |      For each value (e.g., pink) the following methods/properties
+     |      will be created:
+     |      
+     |        * all_behaviors - set of all behaviors (read-only)
+     |        * pink_behaviors - set of behaviors with value of 'pink' (read-only)
+     |        * set_all('pink')
+     |        * set_all_pink()    - set all behaviors to value of 'pink'
     
     class jsonlint(__builtin__.object)
      |  This class contains most of the logic for the "jsonlint" command.
@@ -1086,7 +2363,97 @@ CLASSES
      |      list of weak references to the object (if defined)
      |  
      |  usage
-     |      A mutlti-line string containing the program usage instructions.
+     |      A multi-line string containing the program usage instructions.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |  
+     |  SUCCESS_FAIL = 'E'
+     |  
+     |  SUCCESS_OK = 'OK'
+     |  
+     |  SUCCESS_WARNING = 'W'
+    
+    class position_marker(__builtin__.object)
+     |  A position marks a specific place in a text document.
+     |  It consists of the following attributes:
+     |  
+     |      * line - The line number, starting at 1
+     |      * column - The column on the line, starting at 0
+     |      * char_position - The number of characters from the start of
+     |                        the document, starting at 0
+     |      * text_after - (optional) a short excerpt of the text of
+     |                     document starting at the current position
+     |  
+     |  Lines are separated by any Unicode line separator character. As an
+     |  exception a CR+LF character pair is treated as being a single line
+     |  separator demarcation.
+     |  
+     |  Columns are simply a measure of the number of characters after the
+     |  start of a new line, starting at 0.  Visual effects caused by
+     |  Unicode characters such as combining characters, bidirectional
+     |  text, zero-width characters and so on do not affect the
+     |  computation of the column regardless of visual appearance.
+     |  
+     |  The char_position is a count of the number of characters since the
+     |  beginning of the document, starting at 0. As used within the
+     |  buffered_stream class, if the document starts with a Unicode Byte
+     |  Order Mark (BOM), the BOM prefix is NOT INCLUDED in the count.
+     |  
+     |  Methods defined here:
+     |  
+     |  __init__(self, offset=0, line=1, column=0, text_after=None)
+     |  
+     |  __repr__(self)
+     |  
+     |  __str__(self)
+     |      Same as the describe() function.
+     |  
+     |  advance(self, s)
+     |      Advance the position from its current place according to
+     |      the given string of characters.
+     |  
+     |  copy(self)
+     |      Create a copy of the position object.
+     |  
+     |  describe(self, show_text=True)
+     |      Returns a human-readable description of the position, in English.
+     |  
+     |  rewind(self)
+     |      Set the position to the start of the document.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  at_end
+     |      Returns True if the position is at the end of the document.
+     |      
+     |      This property must be set by the user.
+     |  
+     |  at_start
+     |      Returns True if the position is at the start of the document.
+     |  
+     |  char_position
+     |      The current character offset from the beginning of the
+     |      document, starts at 0.
+     |  
+     |  column
+     |      The current character column from the beginning of the
+     |      document, starts at 0.
+     |  
+     |  line
+     |      The current line within the document, starts at 1.
+     |  
+     |  text_after
+     |      Returns a textual excerpt starting at the current position.
+     |      
+     |      This property must be set by the user.
     
     class utf32(codecs.CodecInfo)
      |  Unicode UTF-32 and UCS4 encoding/decoding support.
@@ -1128,7 +2495,7 @@ CLASSES
      |  encode(obj, errors='strict', endianness=None, include_bom=True)
      |      Encodes a Unicode string into a UTF-32 encoded byte string.
      |      
-     |      Returns a tuple: (bytearry, num_chars)
+     |      Returns a tuple: (bytearray, num_chars)
      |      
      |      The errors argument should be one of 'strict', 'ignore', or 'replace'.
      |      
@@ -1248,14 +2615,78 @@ CLASSES
      |      Raises ValueError if the value is not present.
 
 FUNCTIONS
-    decode(txt, strict=False, encoding=None, **kw)
+    decode(txt, encoding=None, **kwargs)
         Decodes a JSON-encoded string into a Python object.
         
-        Strictness:
-        -----------
-        If 'strict' is set to True, then those strings that are not
-        absolutely strictly conforming to JSON will result in a
-        JSONDecodeError exception.
+        == Optional arguments ==
+        
+        * 'encoding'  (string, default None)
+        
+           This argument provides a hint regarding the character encoding
+           that the input text is assumed to be in (if it is not already a
+           unicode string type).
+        
+           If set to None then autodetection of the encoding is attempted
+           (see discussion above). Otherwise this argument should be the
+           name of a registered codec (see the standard 'codecs' module).
+        
+        * 'strict'    (Boolean, default False)
+        
+            If 'strict' is set to True, then those strings that are not
+            entirely strictly conforming to JSON will result in a
+            JSONDecodeError exception.
+        
+        * 'return_errors'    (Boolean, default False)
+        
+            Controls the return value from this function. If False, then
+            only the Python equivalent object is returned on success, or
+            an error will be raised as an exception.
+        
+            If True then a 2-tuple is returned: (object, error_list). The
+            error_list will be an empty list [] if the decoding was
+            successful, otherwise it will be a list of all the errors
+            encountered.  Note that it is possible for an object to be
+            returned even if errors were encountered.
+        
+        * 'return_stats'    (Boolean, default False)
+        
+            Controls whether statistics about the decoded JSON document
+            are returns (and instance of decode_statistics).
+        
+            If True, then the stats object will be added to the end of the
+            tuple returned.  If return_errors is also set then a 3-tuple
+            is returned, otherwise a 2-tuple is returned.
+        
+        * 'write_errors'    (Boolean OR File-like object, default False)
+        
+            Controls what to do with errors.
+        
+            - If False, then the first decoding error is raised as an exception.
+            - If True, then errors will be printed out to sys.stderr.
+            - If a File-like object, then errors will be printed to that file.
+        
+            The write_errors and return_errors arguments can be set
+            independently.
+        
+        * 'filename_for_errors'   (string or None)
+        
+            Provides a filename to be used when writting error messages.
+        
+        * 'allow_xxx', 'warn_xxx', and 'forbid_xxx'    (Booleans)
+        
+            These arguments allow for fine-adjustments to be made to the
+            'strict' argument, by allowing or forbidding specific
+            syntaxes.
+        
+            There are many of these arguments, named by replacing the
+            "xxx" with any number of possible behavior names (See the JSON
+            class for more details).
+        
+            Each of these will allow (or forbid) the specific behavior,
+            after the evaluation of the 'strict' argument.  For example,
+            if strict=True then by also passing 'allow_comments=True' then
+            comments will be allowed.  If strict=False then
+            forbid_comments=True will allow everything except comments.
         
         Unicode decoding:
         -----------------
@@ -1278,18 +2709,6 @@ FUNCTIONS
         
             python_object = demjson.decode( input_bytes, encoding='utf8' )
         
-        Optional behaviors:
-        -------------------
-        Optional keywords arguments must be of the form
-            allow_xxxx=True/False
-        or
-            prevent_xxxx=True/False
-        where each will allow or prevent the specific behavior, after the
-        evaluation of the 'strict' argument.  For example, if strict=True
-        then by also passing 'allow_comments=True' then comments will be
-        allowed.  If strict=False then prevent_comments=True will allow
-        everything except comments.
-        
         Callback hooks:
         ---------------
         You may supply callback hooks by using the hook name as the
@@ -1301,22 +2720,41 @@ FUNCTIONS
     determine_float_precision()
         Returns a tuple (significant_digits, max_exponent) for the float type.
     
-    encode(obj, strict=False, compactly=True, escape_unicode=False, encoding=None, encode_namedtuple_as_object=True, **kw)
+    encode(obj, encoding=None, **kwargs)
         Encodes a Python object into a JSON-encoded string.
         
-        If 'strict' is set to True, then only strictly-conforming JSON
-        output will be produced.  Note that this means that some types
-        of values may not be convertable and will result in a
-        JSONEncodeError exception.
+        * 'strict'    (Boolean, default False)
         
-        If 'compactly' is set to True, then the resulting string will
-        have all extraneous white space removed; if False then the
-        string will be "pretty printed" with whitespace and indentation
-        added to make it more readable.
+            If 'strict' is set to True, then only strictly-conforming JSON
+            output will be produced.  Note that this means that some types
+            of values may not be convertable and will result in a
+            JSONEncodeError exception.
         
-        If 'encode_namedtuple_as_object' is True, then objects of type
-        namedtuple, or subclasses of 'tuple' that have an _asdict()
-        method, will be encoded as an object rather than an array.
+        * 'compactly'    (Boolean, default True)
+        
+            If 'compactly' is set to True, then the resulting string will
+            have all extraneous white space removed; if False then the
+            string will be "pretty printed" with whitespace and
+            indentation added to make it more readable.
+        
+        * 'encode_namedtuple_as_object'  (Boolean or callable, default True)
+        
+            If True, then objects of type namedtuple, or subclasses of
+            'tuple' that have an _asdict() method, will be encoded as an
+            object rather than an array.
+            If can also be a predicate function that takes a namedtuple
+            object as an argument and returns True or False.
+        
+        * 'indent_amount'   (Integer, default 2)
+        
+            The number of spaces to output for each indentation level.
+            If 'compactly' is True then indentation is ignored.
+        
+        * 'indent_limit'    (Integer or None, default None)
+        
+            If not None, then this is the maximum limit of indentation
+            levels, after which further indentation spaces are not
+            inserted.  If None, then there is no limit.
         
         CONCERNING CHARACTER ENCODING:
         
@@ -1355,11 +2793,24 @@ FUNCTIONS
     skipstringsafe(s, start=0, end=None)
     
     skipstringsafe_slow(s, start=0, end=None)
+    
+    smart_sort_transform(key)
 
 DATA
+    ALLOW = 'allow'
+    FORBID = 'forbid'
+    SORT_ALPHA = 'alpha'
+    SORT_ALPHA_CI = 'alpha_ci'
+    SORT_NONE = 'none'
+    SORT_PRESERVE = 'preserve'
+    SORT_SMART = 'smart'
+    STRICTNESS_STRICT = 'strict'
+    STRICTNESS_TOLERANT = 'tolerant'
+    STRICTNESS_WARN = 'warn'
+    WARN = 'warn'
     __author__ = 'Deron Meranda <http://deron.meranda.us/>'
     __credits__ = 'Copyright (c) 2006-2014 Deron E. Meranda <http:/.../lic...
-    __date__ = '2014-05-02'
+    __date__ = '2014-05-17'
     __homepage__ = 'http://deron.meranda.us/python/demjson/'
     __version__ = '2.0'
     __version_info__ = version_info(major=2, minor=0, micro=0)
@@ -1370,6 +2821,9 @@ DATA
     inf = inf
     nan = nan
     neginf = -inf
+    sorting_method_aliases = {'ci': 'alpha_ci'}
+    sorting_methods = {'alpha': 'Sort strictly alphabetically', 'alpha_ci'...
+    syntax_error = demjson.undefined
     undefined = demjson.undefined
     version = '2.0'
     version_info = version_info(major=2, minor=0, micro=0)
@@ -1378,7 +2832,7 @@ VERSION
     2.0
 
 DATE
-    2014-05-02
+    2014-05-17
 
 AUTHOR
     Deron Meranda <http://deron.meranda.us/>

@@ -5,8 +5,8 @@ Starting with release 2.0, demjson and jsonlint, can support either
 Python 2 or Python 3 -- though it must be installed as described below
 to work with Python 3.
 
-Be aware though that the API will have slightly different behavior in
-Python 3, because it uses the 'bytes' type in a few places.
+Be aware that the API will have slightly different behavior in Python 3,
+mainly because it uses the 'bytes' type in a few places.
 
 
 Installing for Python 3
@@ -14,10 +14,10 @@ Installing for Python 3
 
 The source for the demjson module is written for Python 2.x.  However,
 since release 2.0, it has been designed to be converted to a Python 3
-equivalent form by using the standard "2to3" Python utility.
+equivalent form by using the standard "2to3" Python conversion utility.
 
 If you have installed demjson with a standard PyPI package
-distribution mechanism; such as pipi, easy_install, or just typing
+distribution mechanism; such as pip, easy_install, or just typing
 "python3 setup.py install"; then the 2to3 conversion will be performed
 automatically as part of the installation process.
 
@@ -31,15 +31,13 @@ manually if needed by:
     PYTHONPATH=.. python3 test_demjson.py
 
 
-API Differences
-===============
+Bytes versus strings
+====================
 
 When calling demjson functions and classes from a Python 3 environment,
 be aware that there are a few differences from what is documented for
-Python 2.  This is mostly that the 'bytes' (byte array) type will
-be used or returned in some cases, where in Python 2 a string type
-may have been used.
-
+Python 2.  Most of these differences involve Python's byte-oriented
+types ('bytes', 'bytearray', and 'memoryview').
 
 Decoding JSON into Python values
 --------------------------------
@@ -47,14 +45,14 @@ Decoding JSON into Python values
 When you decode a JSON document you can pass either a string or
 a bytes type.
 
-If you pass a string when decoding a JSON document, then it is assumed
-that the string is already a Unicode character sequence, and so the
-whole Unicode decoding step will be skipped.
+If you pass a string, then it is assumed to already be a sequence
+of Unicode characters.  So demjson's own Unicode decoding step will be
+skipped.
 
-When you pass a 'bytes' or 'bytearray' type the decode function will
+When you pass a byte-oriented type the decode() function will
 attempt to detect the Unicode encoding and appropriately convert the
-bytes into a unicode string first.  You can override the guessed
-encoding by specifying the appropriate codec name.
+bytes into a Unicode string first.  You can override the guessed
+encoding by specifying the appropriate codec name, or codec object.
 
 For example, the following are equivalent and have the same result:
 
@@ -62,11 +60,31 @@ For example, the following are equivalent and have the same result:
     demjson.decode( b'"\xe2\x80\x94"' )
     demjson.decode( bytes([ 0x22, 0xE2, 0x80, 0x94, 0x22 ]) )
 
-Notice that with the last two examples the decode function has
+Notice that with the last two examples the decode() function has
 automatically detected that the byte array was UTF-8 encoded.  You can
 of course pass in an 'encoding' argument to force the Unicode decoding
 codec to use -- though if you get this wrong a UnicodeDecodeError may
 be raised.
+
+
+Reading JSON from a file
+------------------------
+
+When reading from a file the bytes it contains must be converted into
+Unicode characters. If you want demjson to do that be sure to open the
+file in binary mode:
+
+    json_data = open("myfile.json", "rb").read()
+    #  => json_data is a bytes array
+    py_data = demjson.decode( json_data, encoding="utf8" )
+
+But if you read the file in text mode then the Unicode decoding is
+done by Python's own IO core, and demjson will parse the
+already-Unicode string without doing any decoding:
+
+    json_data = open("myfile.json", "r", encoding="utf8").read()
+    #  => json_data is a (unicode) string
+    py_data = demjson.decode( json_data )
 
 
 Encoding Python values to JSON
@@ -80,23 +98,82 @@ However if you specify a particular encoding, then you will
 instead get a byte array as a result.
 
     demjson.encode( "\u2012" )
-         -- returns a string of length 3
+    #  => Returns a string of length 3
 
     demjson.encode( "\u2012", encoding="utf-8" )
-         -- returns 5 bytes b'"\xe2\x80\x94"'
+    #  => Returns 5 bytes b'"\xe2\x80\x94"'
 
 
-Other notes on the 'bytes' type
--------------------------------
+Writing JSON to a file
+----------------------
+
+When generating JSON and writing it to a file all the Unicode
+characters must be encoded into bytes.  You can let demjson do that by
+specifying an encoding, though be sure that you open the output file
+in binary mode:
+
+    json_data = demjson.encode( py_data, encoding="utf-8" )
+    # json_data will be a bytes array
+    open("myfile.json", "wb" ).write( json_data )
+
+The above has the advantage that demjson can automatically adjust the
+\u-escaping depending on the output encoding.
+
+But if you don't ask for any encoding you'll get the JSON output as a
+Unicode string, in which case you need to open your output file in
+text mode with a specific encoding.  You must choose a suitable
+encoding or you could get a UnicodeEncodeError.
+
+    json_data = demjson.encode( py_data )
+    # json_data will be a (unicode) string
+    open("myfile.json", "w", encoding="utf-8" ).write( json_data )
+
+
+Encoding byte types
+-------------------
 
 If you are encoding into JSON and the Python value you pass is, or
-contains, a 'bytes' a 'bytearray' value; then the resulting JSON will
-contain an array of integers, each of which is the value of one byte.
+contains, any byte-oriented type ('bytes', 'bytearray', or
+'memoryview') value; then the bytes must be converted into a different
+value that can be represented in JSON.
 
-For example, all of the following:
+The default is to convert bytes into an array of integers, each with
+a value from 0 to 255 representing a single byte.  For example:
 
-    demjson.encode( b'ABC' )
-    demjson.encode( bytes([65, 66, 67]) )
-    demjson.encode( bytearray([65, 66, 67]) )
+    py_data = b'\x55\xff'
 
-return a string represenging the JSON document of  "[65,66,67]"
+    demjson.encode( py_data )
+    # Gives =>  '[85,255]'
+
+You can supply a function to the 'encode_bytes' hook to change how
+bytes get encoded.
+
+    def to_hex( bytes_val ):
+        return ":".join([ "%02x" % b for b in bytes_val ])
+
+    demjson.encode( py_data, encode_bytes=to_hex )
+    # Gives => '"55:ff"'
+
+See the 'encode_bytes' hook description in HOOKS.txt for further details.
+
+
+Other Python 3 specifics
+========================
+
+Data types
+----------
+
+When encoding JSON, most of the new data types introduced with
+Python 3 will be encoded. Note only does this include the
+byte-oriented types, but also Enum and ChainMap.</p>
+
+
+Chained exceptions
+------------------
+
+Any errors that are incidentally raised during JSON encoding or
+decoding will be wrapped in a 'JSONError' (or subclass).  In Python 3,
+this wrapping uses the standard Exception Chaining (PEP 3134)
+mechanism.</p>
+
+See the Exception Handling example in the file HOOKS.txt

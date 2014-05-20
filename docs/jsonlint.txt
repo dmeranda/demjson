@@ -1,25 +1,48 @@
-Usage: jsonlint [<options> ...] inputfile.json ...
+Usage: jsonlint [<options> ...] [--] inputfile.json ...
 
 With no input filename, or "-", it will read from standard input.
 
 The return status will be 0 if the file is conforming JSON (per the
-RFC 7158 specification), or non-zero otherwise.
+RFC 7159 specification), or non-zero otherwise.
 
-OPTIONS:
+GENERAL OPTIONS:
 
  -v | --verbose    Show details of lint checking
- -q | --quiet      Don't show any warnings
+ -q | --quiet      Don't show any output (except for reformatting)
 
- -s | --strict     Be strict in what is considered conforming JSON (the default)
- -S | --nonstrict  Be loose in what is considered conforming JSON
+STRICTNESS OPTIONS (WARNINGS AND ERRORS):
+
+ -W | --tolerant   Be tolerant, but warn about non-conformance (default)
+ -s | --strict     Be strict in what is considered conforming JSON
+ -S | --nonstrict  Be tolerant in what is considered conforming JSON
+
+ --allow=...      -\
+ --warn=...         |-- These options let you pick specific behaviors.
+ --forbid=...     -/      Use --help-behaviors for more
+
+STATISTICS OPTIONS:
+
+ --stats       Show statistics about JSON document
+
+REFORMATTING OPTIONS:
 
  -f | --format     Reformat the JSON text (if conforming) to stdout
  -F | --format-compactly
         Reformat the JSON simlar to -f, but do so compactly by
         removing all unnecessary whitespace
+
  -o filename | --output filename
         The filename to which reformatted JSON is to be written.
         Without this option the standard output is used.
+
+ --sort <kind>     How to sort object/dictionary keys, <kind> is one of:
+                 alpha - Sort strictly alphabetically
+              alpha_ci - Sort alphabetically case-insensitive
+              preserve - Preserve original order when reformatting
+                 smart - Sort alphabetically and numerically (DEFAULT)
+
+ --indent tabs | <nnn>   Number of spaces to use per indentation level,
+                         or use tab characters if "tabs" given.
 
 UNICODE OPTIONS:
 
@@ -34,6 +57,12 @@ UNICODE OPTIONS:
 
     Unless set, the input encoding is guessed and the output
     encoding will be "utf-8".
+
+OTHER OPTIONS:
+
+ --recursion-limit=nnn     Set the Python recursion limit to number
+ --leading-zero-radix=8|10 The radix to use for numbers with leading
+                           zeros. 8=octal, 10=decimal.
 
 REFORMATTING / PRETTY-PRINTING:
 
@@ -50,7 +79,48 @@ REFORMATTING / PRETTY-PRINTING:
 MORE INFORMATION:
 
     Use 'jsonlint --version [-v]' to see versioning information.
-    Use 'jsonlint --copyright' to see author and copyright details.'
+    Use 'jsonlint --copyright' to see author and copyright details.
+    Use 'jsonlint [-W|-s|-S] --help-behaviors' for help on specific checks.
 
     jsonlint is distributed as part of the "demjson" Python module.
     See http://deron.meranda.us/python/demjson/
+
+
+BEHAVIOR OPTIONS:
+
+These set of options let you control which checks are to be performed.
+They may be turned on or off by listing them as arguments to one of
+the options --allow, --warn, or --forbid ; for example:
+
+    jsonlint --allow comments,hex-numbers --forbid duplicate-keys
+
+The default shown is for strict mode
+
+Default Behavior_name             Description
+------- ------------------------- --------------------------------------------------
+forbid  all-numeric-signs         Numbers may be prefixed by any '+' and '-', e.g., +4, -+-+77
+allow   any-type-at-start         A JSON document may start with any type, not just arrays or objects
+forbid  binary-numbers            Binary numbers, e.g., 0b1001
+warn    bom                       A JSON document may start with a Unicode BOM (Byte Order Mark)
+forbid  comments                  JavaScript comments, both /*...*/ and //... styles
+forbid  control-char-in-string    Strings may contain raw control characters without \u-escaping
+warn    duplicate-keys            Objects may have repeated keys
+forbid  extended-unicode-escapes  Extended Unicode escape sequence \u{..} for non-BMP characters
+forbid  format-control-chars      Unicode "format control characters" may appear in the input
+forbid  hex-numbers               Hexadecimal numbers, e.g., 0x1f
+forbid  identifier-keys           JavaScript identifiers are converted to strings when used as object keys
+forbid  initial-decimal-point     Floating-point numbers may start with a decimal point (no units digit)
+forbid  js-string-escapes         All JavaScript character \-escape sequences may be in strings
+forbid  leading-zeros             Numbers may have extra leading zeros (see --leading-zero-radix option)
+forbid  non-numbers               Non-numbers may be used, such as NaN or Infinity
+warn    non-portable              Anything technically valid but likely to cause data portablibity issues
+forbid  nonescape-characters      Unknown character \-escape sequences stand for that character (\Q -> 'Q')
+forbid  nonstring-keys            Value types other than strings (or identifiers) may be used as object keys
+forbid  octal-numbers             New-style octal numbers, e.g., 0o731  (see leading-zeros for legacy octals)
+forbid  omitted-array-elements    Arrays may have omitted/elided elements, e.g., [1,,3] == [1,undefined,3]
+forbid  single-quoted-strings     Strings may be delimited with both double (") and single (') quotation marks
+forbid  trailing-comma            A final comma may end the list of array or object members
+forbid  trailing-decimal-point    Floating-point number may end with a decimal point and no following fractional digits
+forbid  undefined-values          The JavaScript 'undefined' value may be used
+forbid  unicode-whitespace        Treat any Unicode whitespace character as valid whitespace
+warn    zero-byte                 Strings may contain U+0000, which may not be safe for C-based programs
