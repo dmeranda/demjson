@@ -11,12 +11,29 @@ It can also reformat or pretty-print JSON documents; either by
 re-indenting or removing unnecessary whitespace for minimal/canonical
 JSON output.
 
-demjson tries to be as closely conforming to the JSON specification,
-published as [IETF RFC 7158](http://www.ietf.org/rfc/rfc7158.txt), as
-possible.  It can also be used in a non-strict mode where it is much
-closer to the JavaScript/ECMAScript syntax (published as ECMA 262).
-The demjson module has full Unicode support and can deal with very
-large numbers.
+
+What's new
+==========
+Version 2.0, released 2014-05-17, is a MAJOR new version with many
+changes and improvements.  Please visit the homepage at
+
+    http://deron.meranda.us/python/demjson/
+
+for a detailed list of changes and other documentation, or read the
+file "docs/CHANGES.txt" included in the source.
+
+The biggest changes in 2.0 include:
+
+  * Now works in Python 3; minimum version supported is Python 2.6
+  * Much improved reporting of errors and warnings
+  * Extensible with user-supplied hooks
+  * Handles many additional Python data types automatically
+  * Statistics
+
+There are many more changes, as well as a small number of backwards
+incompatibilities.  Where possible these incompatibilities were kept
+to a minimum, however it is highly recommended that you read the
+change notes thoroughly.
 
 
 Example use
@@ -45,189 +62,6 @@ To use the accompaning "jsonlint" command script:
     # To pretty-print (reformat) a JSON file
     jsonlint --format sample.json
 ```
-
-
-What's new
-==========
-
-These are the changes from 1.6 to 2.0 (released 2014-05-02).  See the
-file "docs/CHANGES.txt" for a complete history of changes.
-
-This is a major new version that contains many added features and
-enhanced functionality, as well as a small number of backwards
-incompatibilities.  Where possible these incompatibilities were kept
-to a minimum, however it is highly recommended that you read these
-change notes thoroughly.
-
- Major changes
- -------------
-
- * Python 3: This version supports both Python 2 and Python 3, via the
-   2to3 conversion program.  When installing with setup.py or a PyPI
-   distribution mechanism such as pip or easy_install, this conversion
-   should automatically happen.
-
-   Note that the API under Python 3 will be slightly different.
-   Mainly new Python types are supported.  Also there will be some
-   cases in which byte array types are used or returned rather than
-   strings.
-
-   Read the file "docs/PYTHON3.txt" for complete information.
-
- * RFC 7159 conformance: The new RFC (published March 2014 and which
-   superseded RFC 4627) relaxes the constraint that a JSON document
-   must start with an object or array.  This also brings it into
-   alignment with the ECMA-404 standard.
-
-   Now any JSON value type is a legal JSON document.
-
- * Callback hooks: This version allows the user to provide a number
-   of different callback functions, or hooks, which can do special
-   processing.  For example when parsing JSON you could detect
-   strings that look like dates, and automatically convert them
-   into Python datetime objects instead.
-
-   Read the file "docs/HOOKS.txt" for complete information.
-
- * Subclassing: Subclassing the demjson.JSON class is now highly
-   discouraged as future changes may alter the method parameters or names.
-
-   In particular overriding the encode_default() method is now
-   DEPRECATED!  It will continue work in this version, but will be
-   removed in a future version.
-
-   The new callback hooks (see below) should provide a better way to
-   achieve most needs that previously would have been done with
-   subclassing.
-
- Data type support
- -----------------
-
- * Python 3 types: Many new types introduced with Python 3 are
-   directly supported, when running in a Python 3 environment.  This
-   includes 'bytes', 'bytearray', 'memoryview', and 'ChainMap'.
-
-   Read the file "docs/PYTHON3.txt" for complete information.
-
- * Named tuples: When encoding to JSON, all named tuples (objects of
-   Python's standard 'collections.namedtuple' type) are now encoded
-   into JSON as objects rather than as arrays.  This behavior can be
-   changed with the 'encode_namedtuple_as_object' argument to False,
-   in which case they will be treated as a normal tuple.
-
-```python
-       from collections import namedtuple
-       Point = namedtuple('Point', ['x','y'])
-       p = Point(5, 8)
-
-       demjson.encode( p )
-            # gives =>    {"x":5, "y":8}
-
-       demjson.encode( p, encode_namedtuple_as_object=False )
-            # gives =>    [5, 8]
-```
-
-   This behavior also applies to any object that follows the
-   namedtuple protocol, i.e., which are subclasses of 'tuple' and that
-   have an "_asdict()" method.
-
-   Note that the order of keys is not necessarily preserved, but instead
-   will appear in the JSON output alphabetically.
-
- * Mutable strings: Support for the old Python mutable strings (the
-   UserDict.MutableString type) has been dropped.  That experimental
-   type had already been deprecated since Python 2.6 and removed
-   entirely from Python 3.  If you have code that passes a
-   MutableString to a JSON encoding function then either do not
-   upgrade to this release, or first convert such types to standard
-   strings before JSON encoding them.
-
- Unicode and codec support
- -------------------------
-
- * Codecs: The 'encoding' argument to the decode() and encode()
-   functions will now accept a codec object as well as an encoding
-   name; i.e., any subclass of 'codecs.CodecInfo'.  All \u-escaping in
-   string literals will be automatically adjusted based on your custom
-   codec's repertoire of characters.
-
- * UTF-32: The included functions for UTF-32/UCS-4 support (missing
-   from older versions of Python) are now presented as a full-blown
-   codec class: 'demjson.utf32'.  It is completely compatible with the
-   standard codecs module.
-
-   It is normally unregisted, but you may register it with the Python codecs system by:
-
-```python
-       import demjson, codecs
-       codecs.register( demjson.utf32.lookup )
-```
-
- * Unicode errors: During reading or writing JSON as raw bytes (when
-   an encoding is specified), any Unicode errors are now wrapped in a
-   JSON error instead.
-
-       - UnicodeDecodeError is transformed into JSONDecodeError
-       - UnicodeEncodeError is transformed into JSONEncodeError
-
-   The original exception is made available inside the top-most error
-   using Python's Exception Chaining mechanism (described in the
-   Errors and Warnings change notes).
-
- * Unicode escapes: When outputting JSON certain additional characters
-   in strings will now always be \u-escaped to increase compatibility
-   with JavaScript.  This includes line terminators (which are
-   forbidden in JavaScript string literals) as well as format control
-   characters (which any JavaScript implementation is allowed to
-   ignore if it chooses per the ECMAscript standard).
-
-   This essentially means that characters in any of the Unicode
-   categories of Cc, Cf, Zl, and Zp will always be \u-escaped; which
-   includes for example:
-
-       - U+007F  DELETE               (Category Cc)
-       - U+00AD  SOFT HYPHEN          (Category Cf)
-       - U+200F  RIGHT-TO-LEFT MARK   (Category Cf)
-       - U+2028  LINE SEPARATOR       (Category Zl)
-       - U+2029  PARAGRAPH SEPARATOR  (Category Zp)
-       - U+E007F CANCEL TAG           (Category Cf)
-
- Errors and warnings
- -------------------
-
- * Error types: The base error type 'JSONError' is now a subclass of
-   Python's standard 'Exception' class rather than 'ValueError'.  If
-   you had been using try...except blocks with ValueError then you
-   will need to change; preferably to catch JSONError.
-
- * Exception chaining: Any errors that are incidentally raised during
-   JSON encoding or decoding, such as UnicodeDecodeError or anything
-   raised by user-supplied hook functions, will now be wrapped inside
-   a standard JSONError (or subclass).
-
-   When running in Python 3 the standard Exception Chaining (PEP 3134)
-   mechanism is employed.  Under Python 2 exception chaining is
-   simulated, but a printed traceback of the original exception may
-   not be printed. The original exception is in the __cause__ member
-   of the outer exception and it's traceback in the __traceback__
-   member.
-
- The jsonlint command
- --------------------
-
- * The "jsonlint" command script will now be installed by default.
-
- * jsonlint class: Almost all the logic of the jsonlint script is now
-   available as a new class, demjson.jsonlint, should you want to call
-   it programatically.
-
-   The included "jsonlint" script file is now just a very small
-   wrapper around that class.
-
- * Other jsonlint improvements:
-       - New -o option to specify output filename
-       - Verbosity is on by default, new --quiet option
-       - Better help text
 
 
 Why use demjson rather than the Python standard library?

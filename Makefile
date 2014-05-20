@@ -35,7 +35,7 @@ show:
 #	   echo include $$f ; \
 #	done | sort -u > $@
 
-dist:   $(DIST_FILE)
+dist:   $(DIST_FILE) $(DOCS)
 	@ls -l -- $(DIST_FILE)
 
 clean:
@@ -60,8 +60,10 @@ $(DIST_FILE): MANIFEST.in $(ALL_FILES)
 
 docs: $(DOCS) ALWAYS
 
-docs/jsonlint.txt: jsonlint
+docs/jsonlint.txt: jsonlint demjson.py
 	PYTHONPATH=. ./jsonlint --help >$@
+	echo "" >>$@
+	PYTHONPATH=. ./jsonlint --strict --help-behaviors >>$@
 
 docs/$(MODULE).txt:     $(MODULE).py
 	pydoc $(MODULE) | sed -e 's|/home/[a-zA-Z0-9_/.-]*/$(MODULE)/dev/||' >docs/$(MODULE).txt
