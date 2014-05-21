@@ -13,7 +13,7 @@ re-indenting or removing unnecessary whitespace for minimal/canonical
 JSON output.
 
 demjson tries to be as closely conforming to the JSON specification,
-published as IETF RFC 7158 <http://www.ietf.org/rfc/rfc7158.txt>, as
+published as IETF RFC 7159 <http://tools.ietf.org/html/rfc7159>, as
 possible.  It can also be used in a non-strict mode where it is much
 closer to the JavaScript/ECMAScript syntax (published as ECMA 262).
 The demjson module has full Unicode support and can deal with very
