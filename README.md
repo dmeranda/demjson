@@ -6,21 +6,20 @@ encoding, decoding, and syntax-checking [JSON](http://json.org/)
 data.  It works under both Python 2 and Python 3.
 
 It comes with a <b>jsonlint</b> script which can be used to validate
-your JSON documents for strict conformance to the JSON specification.
-It can also reformat or pretty-print JSON documents; either by
-re-indenting or removing unnecessary whitespace for minimal/canonical
-JSON output.
+your JSON documents for strict conformance to the JSON specification,
+and to detect potential data portability issues.  It can also reformat
+or pretty-print JSON documents; either by re-indenting or removing
+unnecessary whitespace.
 
 
 What's new
 ==========
-Version 2.0, released 2014-05-17, is a MAJOR new version with many
-changes and improvements.  Please visit the homepage at
+<b>Version 2.0</b>, released 2014-05-17, is a MAJOR new version with many
+changes and improvements.
 
-    http://deron.meranda.us/python/demjson/
-
-for a detailed list of changes and other documentation, or read the
-file "docs/CHANGES.txt" included in the source.
+Visit http://deron.meranda.us/python/demjson/ for complete details
+and documentation.  Additional documentation may also be found
+under the "docs/" folder of the source.
 
 The biggest changes in 2.0 include:
 
@@ -42,50 +41,44 @@ Example use
 To use demjson from within your Python programs:
 
 ```python
-    import demjson
+    >>> import demjson
 
-    # Convert a Python value into JSON
-    demjson.encode( {'Happy': True, 'Other': None} )
-          # returns string =>  {"Happy":true,"Other":null}
+    >>> demjson.encode( ['one',42,True,None] )    # From Python to JSON
+    '["one",42,true,null]'
 
-    # Convert a JSON document into a Python value
-    demjson.decode( '{"Happy":true,"Other":null}' )
-          # returns dict => {'Other': None, 'Happy': True}
+    >>> demjson.decode( '["one",42,true,null]' )  # From JSON to Python
+    ['one', 42, True, None]
 ```
 
-To use the accompaning "jsonlint" command script:
+To check a JSON data file for errors or problems:
 
 ```bash
-    # To check whether a file contains valid JSON
-    jsonlint sample.json
+    $ jsonlint my.json
 
-    # To pretty-print (reformat) a JSON file
-    jsonlint --format sample.json
+    my.json:1:8: Error: Numbers may not have extra leading zeros: '017'
+       |  At line 1, column 8, offset 8
+    my.json:4:10: Warning: Object contains same key more than once: 'Name'
+       |  At line 4, column 10, offset 49
+       |  Object started at line 1, column 0, offset 0 (AT-START)
+    my.json:9:11: Warning: Integers larger than 53-bits are not portable
+       |  At line 9, column 11, offset 142
+    my.json: has errors
 ```
 
 
-Why use demjson rather than the Python standard library?
-========================================================
+Why use demjson?
+================
 
-demjson was written before Python had any built-in JSON support in its
-standard library.  At the time there were just a handful of
-third-party libraries; and none of them were completely compliant with
-the RFC.  Also what I considered to be the best of the group
-(simplejson) was a compiled C extension.
+I wrote demjson before Python had any JSON support in its standard
+library.  If all you need is to be able to read or write JSON data,
+then you may wish to just use what's built into Python.
 
-So I wrote demjson to be:
+However demjson is extremely feature rich and is quite useful in
+certain applications.  It is especially good at error checking
+JSON data and for being able to parse more of the JavaScript syntax
+than is permitted by strict JSON.
 
- * Pure Python, requiring no compiled extension.
- * 100% RFC compliant. It should follow the JSON specification exactly.
-
-It should be noted that Python has since added JSON into its standard
-library (which was actually an "absorption" of simplejson, the C
-extension module I previously mentioned, but after it had been fixed
-to repair its RFC issues).
-
-For most uses, the standard Python JSON library should be sufficient.
-
-However demjson may still be useful for some purposes:
+A few advantages of demjson are:
 
  * It works in old Python versions that don't have JSON built in;
 
@@ -105,8 +98,7 @@ However demjson may still be useful for some purposes:
  * In non-strict mode it can also deal with slightly non-conforming
    input that is more JavaScript than JSON (such as allowing comments).
 
- * It supports a broader set of types during conversion, including
-   Python's Decimal or UserString.
+ * It supports a broader set of Python types during conversion.
 
 
 Installation
