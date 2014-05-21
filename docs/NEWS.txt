@@ -1,7 +1,7 @@
 News announcements regarding the demjson python module.
 See the file CHANGES.txt for more details.
 
-2014-05-17  Release 2.0, major enhancements, Python 3, callback hooks, etc.
+2014-05-21  Release 2.0, major enhancements, Python 3, callback hooks, etc.
 2011-04-01  Release 1.6, bug fix in jsonlint
 2010-10-10  Release 1.5, bug fix with code point U+00FF
 2008-12-17  Release 1.4, license changed to LGPL 3 (no code changes).

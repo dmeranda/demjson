@@ -14,7 +14,7 @@ unnecessary whitespace.
 
 What's new
 ==========
-<b>Version 2.0</b>, released 2014-05-17, is a MAJOR new version with many
+<b>Version 2.0</b>, released 2014-05-21, is a MAJOR new version with many
 changes and improvements.
 
 Visit http://deron.meranda.us/python/demjson/ for complete details

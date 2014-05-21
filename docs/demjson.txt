@@ -2810,7 +2810,7 @@ DATA
     WARN = 'warn'
     __author__ = 'Deron Meranda <http://deron.meranda.us/>'
     __credits__ = 'Copyright (c) 2006-2014 Deron E. Meranda <http:/.../lic...
-    __date__ = '2014-05-17'
+    __date__ = '2014-05-21'
     __homepage__ = 'http://deron.meranda.us/python/demjson/'
     __version__ = '2.0'
     __version_info__ = version_info(major=2, minor=0, micro=0)
@@ -2832,7 +2832,7 @@ VERSION
     2.0
 
 DATE
-    2014-05-17
+    2014-05-21
 
 AUTHOR
     Deron Meranda <http://deron.meranda.us/>
