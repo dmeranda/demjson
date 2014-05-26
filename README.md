@@ -14,6 +14,10 @@ unnecessary whitespace.
 
 What's new
 ==========
+<b>Version 2.0.1</b> is a re-packaging of 2.0, after discovering
+problems with incorrect checksums in the PyPI distribution of 2.0.  No
+changes were made from 2.0.
+
 <b>Version 2.0</b>, released 2014-05-21, is a MAJOR new version with many
 changes and improvements.
 

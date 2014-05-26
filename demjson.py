@@ -120,9 +120,9 @@ r""" A JSON data encoder and decoder.
 __author__ = "Deron Meranda <http://deron.meranda.us/>"
 __homepage__ = "http://deron.meranda.us/python/demjson/"
 
-__date__ = "2014-05-21"
-__version__ = "2.0"
-__version_info__ = ( 2, 0, 0 )    # Will be converted into a namedtuple below
+__date__ = "2014-05-26"
+__version__ = "2.0.1"
+__version_info__ = ( 2, 0, 1 )    # Will be converted into a namedtuple below
 
 __credits__ = """Copyright (c) 2006-2014 Deron E. Meranda <http://deron.meranda.us/>
 

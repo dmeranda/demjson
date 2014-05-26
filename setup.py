@@ -1,7 +1,7 @@
 # Python package setup script        -*- coding: utf-8 -*-
 
 name = 'demjson'
-version = '2.0'
+version = '2.0.1'
 
 import sys
 if sys.version_info.major >= 3:

@@ -1,6 +1,13 @@
 Change history for demjson python module.
 
 
+Version 2.0.1 released 2014-05-26
+=================================
+This is a re-packaging of 2.0, after discovering problems with
+incorrect checksums in the PyPI distribution of 2.0.  No changes were
+made from 2.0.
+
+
 Version 2.0 released 2014-05-21
 ===============================
 
