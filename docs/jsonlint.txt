@@ -35,6 +35,8 @@ REFORMATTING OPTIONS:
         The filename to which reformatted JSON is to be written.
         Without this option the standard output is used.
 
+ --[no-]keep-format   Try to preserve numeric radix, e.g., hex, octal, etc.
+
  --sort <kind>     How to sort object/dictionary keys, <kind> is one of:
                  alpha - Sort strictly alphabetically
               alpha_ci - Sort alphabetically case-insensitive

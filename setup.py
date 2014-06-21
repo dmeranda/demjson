@@ -1,10 +1,15 @@
 # Python package setup script        -*- coding: utf-8 -*-
 
 name = 'demjson'
-version = '2.0.1'
+version = '2.2'
 
 import sys
-if sys.version_info.major >= 3:
+try:
+    py_major = sys.version_info.major
+except AttributeError:
+    py_major = sys.version_info[0]
+
+if py_major >= 3:
     # Python 3, use setuptools first
     try:
         from setuptools import setup
@@ -19,7 +24,7 @@ else:
 
 py3extra = {}
 
-if sys.version_info.major >= 3:
+if py_major >= 3:
     py3extra['use_2to3'] = True
     #py3extra['convert_2to3_doctests'] = ['src/your/module/README.txt']
     #py3extra['use_2to3_fixers'] = ['your.fixers']

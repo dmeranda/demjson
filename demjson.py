@@ -120,9 +120,9 @@ r""" A JSON data encoder and decoder.
 __author__ = "Deron Meranda <http://deron.meranda.us/>"
 __homepage__ = "http://deron.meranda.us/python/demjson/"
 
-__date__ = "2014-05-26"
-__version__ = "2.0.1"
-__version_info__ = ( 2, 0, 1 )    # Will be converted into a namedtuple below
+__date__ = "2014-06-20"
+__version__ = "2.2"
+__version_info__ = ( 2, 2, 0 )    # Will be converted into a namedtuple below
 
 __credits__ = """Copyright (c) 2006-2014 Deron E. Meranda <http://deron.meranda.us/>
 
@@ -147,6 +147,7 @@ or <http://www.fsf.org/licensing/>.
 
 # ----------------------------------------------------------------------
 
+# Set demjson version
 try:
     from collections import namedtuple as _namedtuple
     __version_info__ = _namedtuple('version_info', ['major', 'minor', 'micro'])( *__version_info__ )
@@ -155,11 +156,34 @@ except ImportError:
 
 version, version_info = __version__, __version_info__
 
+
+# Determine Python version
+_py_major, _py_minor = None, None
+def _get_pyver():
+    global _py_major, _py_minor
+    import sys
+    vi = sys.version_info
+    try:
+        _py_major, _py_minor = vi.major, vi.minor
+    except AttributeError:
+        _py_major, _py_minor = vi[0], vi[1]
+_get_pyver()
+
 # ----------------------------------------------------------------------
 # Useful global constants
 
 content_type = 'application/json'
 file_ext = 'json'
+
+
+class _dummy_context_manager(object):
+    """A context manager that does nothing on entry or exit."""
+    def __enter__(self):
+        pass
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        return False
+_dummy_context_manager = _dummy_context_manager()
+
 
 # ----------------------------------------------------------------------
 # Decimal and float types.
@@ -177,43 +201,154 @@ try:
 except ImportError:
     decimal = None
 
-def determine_float_precision():
-    """Returns a tuple (significant_digits, max_exponent) for the float type.
+
+def determine_float_limits( number_type=float ):
+    """Determines the precision and range of the given float type.
+
+    The passed in 'number_type' argument should refer to the type of
+    floating-point number.  It should either be the built-in 'float',
+    or decimal context or constructor; i.e., one of:
+
+        # 1. FLOAT TYPE
+        determine_float_limits( float )
+
+        # 2. DEFAULT DECIMAL CONTEXT
+        determine_float_limits( decimal.Decimal )
+
+        # 3. CUSTOM DECIMAL CONTEXT
+        ctx = decimal.Context( prec=75 )
+        determine_float_limits( ctx )
+
+    Returns a named tuple with components:
+
+         ( significant_digits,
+           max_exponent,
+           min_exponent )
+
+    Where:
+        * significant_digits -- maximum number of *decimal* digits
+             that can be represented without any loss of precision.
+             This is conservative, so if there are 16 1/2 digits, it
+             will return 16, not 17.
+
+        * max_exponent -- The maximum exponent (power of 10) that can
+             be represented before an overflow (or rounding to
+             infinity) occurs.
+
+        * min_exponent -- The minimum exponent (negative power of 10)
+             that can be represented before either an underflow
+             (rounding to zero) or a subnormal result (loss of
+             precision) occurs.  Note this is conservative, as
+             subnormal numbers are excluded.
+
     """
-    import math
-    # Just count the digits in pi.  The last two decimal digits
-    # may only be partial digits, so discount for them.
-    whole, frac = repr(math.pi).split('.')
-    sigdigits = len(whole) + len(frac) - 2
+    if decimal:
+        numeric_exceptions = (ValueError,decimal.Overflow,decimal.Underflow)
+    else:
+        numeric_exceptions = (ValueError,)
 
-    # This is a simple binary search.  We find the largest exponent
-    # that the float() type can handle without going infinite or
-    # raising errors.
-    maxexp = None
-    minv = 0; maxv = 1000
-    while True:
-        if minv+1 == maxv:
-            maxexp = minv - 1
-            break
-        elif maxv < minv:
-            maxexp = None
-            break
-        m = (minv + maxv) // 2
-        try:
-            f = repr(float( '1e+%d' % m ))
-        except ValueError:
-            f = None
-        else:
-            if not f or f[0] < '0' or f[0] > '9':
-                f = None
-        if not f:
-            # infinite
-            maxv = m
-        else:
-            minv = m
-    return sigdigits, maxexp
+    if decimal and number_type == decimal.Decimal:
+        number_type = decimal.DefaultContext
 
-float_sigdigits, float_maxexp = determine_float_precision()
+    if decimal and isinstance(number_type, decimal.Context):
+        # Passed a decimal Context, extract the bound creator function.
+        create_num = number_type.create_decimal
+        decimal_ctx = decimal.localcontext(number_type)
+        is_zero_or_subnormal = lambda n: n.is_zero() or n.is_subnormal()
+    elif number_type == float:
+        create_num = number_type
+        decimal_ctx = _dummy_context_manager
+        is_zero_or_subnormal = lambda n: n==0
+    else:
+        raise TypeError("Expected a float type, e.g., float or decimal context")
+
+    with decimal_ctx:
+        zero = create_num('0.0')
+
+        # Find signifianct digits by comparing floats of increasing
+        # number of digits, differing in the last digit only, until
+        # they numerically compare as being equal.
+        sigdigits = None
+        n = 0
+        while True:
+            n = n + 1
+            pfx = '0.' + '1'*n
+            a = create_num( pfx + '0')
+            for sfx in '123456789':  # Check all possible last digits to
+                # avoid any partial-decimal.
+                b = create_num( pfx + sfx )
+                if (a+zero) == (b+zero):
+                    sigdigits = n
+                    break
+            if sigdigits:
+                break
+
+        # Find exponent limits.  First find order of magnitude and
+        # then use a binary search to find the exact exponent.
+        base = '1.' + '1'*(sigdigits-1)
+        base0 = '1.' + '1'*(sigdigits-2)
+        minexp, maxexp = None, None
+
+        for expsign in ('+','-'):
+            minv = 0; maxv = 10
+            # First find order of magnitude of exponent limit
+            while True:
+                try:
+                    s  = base  + 'e' + expsign + str(maxv)
+                    s0 = base0 + 'e' + expsign + str(maxv)
+                    f  = create_num( s ) + zero
+                    f0 = create_num( s0 ) + zero
+                except numeric_exceptions:
+                    f = None
+                if not f or not str(f)[0].isdigit() or is_zero_or_subnormal(f) or f==f0:
+                    break
+                else:
+                    minv = maxv
+                    maxv = maxv * 10
+
+            # Now do a binary search to find exact limit
+            while True:
+                if minv+1 == maxv:
+                    if expsign=='+':
+                        maxexp = minv
+                    else:
+                        minexp = minv
+                    break
+                elif maxv < minv:
+                    if expsign=='+':
+                        maxexp = None
+                    else:
+                        minexp = None
+                    break
+                m = (minv + maxv) // 2
+                try:
+                    s  = base  + 'e' + expsign + str(m)
+                    s0 = base0 + 'e' + expsign + str(m)
+                    f  = create_num( s ) + zero
+                    f0 = create_num( s0 ) + zero
+                except numeric_exceptions:
+                    f = None
+                else:
+                    if not f or not str(f)[0].isdigit():
+                        f = None
+                    elif is_zero_or_subnormal(f) or f==f0:
+                        f = None
+                if not f:
+                    # infinite
+                    maxv = m
+                else:
+                    minv = m
+
+    return _namedtuple('float_limits', ['significant_digits', 'max_exponent', 'min_exponent'])( sigdigits, maxexp, -minexp )
+
+
+float_sigdigits, float_maxexp, float_minexp = determine_float_limits( float )
+
+
+# For backwards compatibility with older demjson versions:
+def determine_float_precision():
+    v = determine_float_limits( float )
+    return ( v.significant_digits, v.max_exponent )
 
 # ----------------------------------------------------------------------
 # The undefined value.
@@ -249,8 +384,8 @@ del _undefined_class
 def _nonnumber_float_constants():
     """Try to return the Nan, Infinity, and -Infinity float values.
     
-    This is unnecessarily complex because there is no standard
-    platform- independent way to do this in Python as the language
+    This is necessarily complex because there is no standard
+    platform-independent way to do this in Python as the language
     (opposed to some implementation of it) doesn't discuss
     non-numbers.  We try various strategies from the best to the
     worst.
@@ -505,6 +640,54 @@ del _nonnumber_float_constants
 
 
 # ----------------------------------------------------------------------
+# Integers
+
+class json_int( (1L).__class__ ):    # Have to specify base this way to satisfy 2to3
+    """A subclass of the Python int/long that remembers its format (hex,octal,etc).
+
+    Initialize it the same as an int, but also accepts an additional keyword
+    argument 'number_format' which should be one of the NUMBER_FORMAT_* values.
+
+        n = json_int( x[, base, number_format=NUMBER_FORMAT_DECIMAL] )
+
+    """
+    def __new__(cls, *args, **kwargs):
+        if 'number_format' in kwargs:
+            number_format = kwargs['number_format']
+            del kwargs['number_format']
+            if number_format not in (NUMBER_FORMAT_DECIMAL, NUMBER_FORMAT_HEX, NUMBER_FORMAT_OCTAL, NUMBER_FORMAT_LEGACYOCTAL, NUMBER_FORMAT_BINARY):
+                raise TypeError("json_int(): Invalid value for number_format argument")
+        else:
+            number_format = NUMBER_FORMAT_DECIMAL
+        obj = super(json_int,cls).__new__(cls,*args,**kwargs)
+        obj._jsonfmt = number_format
+        return obj
+
+    @property
+    def number_format(self):
+        """The original radix format of the number"""
+        return self._jsonfmt
+
+    def json_format(self):
+        """Returns the integer value formatted as a JSON literal"""
+        fmt = self._jsonfmt
+        if fmt == NUMBER_FORMAT_HEX:
+            return format(self, '#x')
+        elif fmt == NUMBER_FORMAT_OCTAL:
+            return format(self, '#o')
+        elif fmt == NUMBER_FORMAT_BINARY:
+            return format(self, '#b')
+        elif fmt == NUMBER_FORMAT_LEGACYOCTAL:
+            if self==0:
+                return '0'  # For some reason Python's int doesn't do '00'
+            elif self < 0:
+                return '-0%o' % (-self)
+            else:
+                return '0%o' % self
+        else:
+            return str(self)
+
+# ----------------------------------------------------------------------
 # String processing helpers
 
 def skipstringsafe( s, start=0, end=None ):
@@ -554,8 +737,7 @@ def extend_and_flatten_list_with_sep( orig_seq, extension_seq, separator='' ):
 def _make_raw_bytes( byte_list ):
     """Takes a list of byte values (numbers) and returns a bytes (Python 3) or string (Python 2)
     """
-    import sys
-    if sys.version_info.major >= 3:
+    if _py_major >= 3:
         b = bytes( byte_list )
     else:
         b = ''.join(chr(n) for n in byte_list)
@@ -618,7 +800,7 @@ class utf32(codecs.CodecInfo):
         import sys, struct
 
         # Make a container that can store bytes
-        if sys.version_info.major >= 3:
+        if _py_major >= 3:
             f = bytearray()
             write = f.extend
             def tobytes():
@@ -757,7 +939,7 @@ class utf32(codecs.CodecInfo):
                 else: # ignore
                     pass
             else:
-                chars.append( unichr(n) )
+                chars.append( helpers.safe_unichr(n) )
         return (u''.join( chars ), num_bytes)
 
     @staticmethod
@@ -790,6 +972,9 @@ class helpers(object):
     hexdigits = '0123456789ABCDEFabcdef'
     octaldigits = '01234567'
     unsafe_string_chars = _make_unsafe_string_chars()
+
+    import sys
+    maxunicode = sys.maxunicode
 
     always_use_custom_codecs = False   # If True use demjson's codecs
                                        # before system codecs. This
@@ -836,6 +1021,20 @@ class helpers(object):
     def char_is_json_ws( c ):
         """Determines if the given character is a JSON white-space character"""
         return c in ' \t\n\r'
+
+    @staticmethod
+    def safe_unichr( codepoint ):
+        """Just like Python's unichr() but works in narrow-Unicode Pythons."""
+        if codepoint >= 0x10000 and codepoint > helpers.maxunicode:
+            # Narrow-Unicode python, construct a UTF-16 surrogate pair.
+            w1, w2 = helpers.make_surrogate_pair( codepoint )
+            if w2 is None:
+                c = unichr(w1)
+            else:
+                c = unichr(w1) + unichr(w2)
+        else:
+            c = unichr(codepoint)
+        return c
 
     @staticmethod
     def char_is_unicode_ws( c ):
@@ -1083,7 +1282,7 @@ class helpers(object):
         b = n2 - 0xDC00
         v = (a << 10) | b
         v += 0x10000
-        return unichr(v)
+        return helpers.safe_unichr(v)
 
     @staticmethod
     def unicode_as_surrogate_pair( c ):
@@ -1098,21 +1297,61 @@ class helpers(object):
 
         """
         n = ord(c)
-        if n < 0x10000:
-            return (unichr(n),)  # in BMP, surrogate pair not required
-        v = n - 0x10000
+        w1, w2 = helpers.make_surrogate_pair(n)
+        if w2 is None:
+            return (unichr(w1),)
+        else:
+            return (unichr(w1), unichr(w2))
+
+    @staticmethod
+    def make_surrogate_pair( codepoint ):
+        """Given a Unicode codepoint (int) returns a 2-tuple of surrogate codepoints."""
+        if codepoint < 0x10000:
+            return (codepoint,None)  # in BMP, surrogate pair not required
+        v = codepoint - 0x10000
         vh = (v >> 10) & 0x3ff   # highest 10 bits
         vl = v & 0x3ff  # lowest 10 bits
         w1 = 0xD800 | vh
         w2 = 0xDC00 | vl
-        return (unichr(w1), unichr(w2))
+        return (w1, w2)
 
     @staticmethod
     def isnumbertype( obj ):
         """Is the object of a Python number type (excluding complex)?"""
         return isinstance(obj, (int,long,float)) \
                and not isinstance(obj, bool) \
-               or obj is nan or obj is inf or obj is neginf
+               or obj is nan or obj is inf or obj is neginf \
+               or (decimal and isinstance(obj, decimal.Decimal))
+
+    @staticmethod
+    def is_negzero( n ):
+        """Is the number value a negative zero?"""
+        if isinstance( n, float ):
+            return n == 0.0 and repr(n).startswith('-')
+        elif decimal and isinstance( n, decimal.Decimal ):
+            return n.is_zero() and n.is_signed()
+        else:
+            return False
+
+    @staticmethod
+    def is_nan( n ):
+        """Is the number a NaN (not-a-number)?"""
+        if isinstance( n, float ):
+            return n is nan or n.hex() == 'nan' or n != n
+        elif decimal and isinstance( n, decimal.Decimal ):
+            return n.is_nan()
+        else:
+            return False
+
+    @staticmethod
+    def is_infinite( n ):
+        """Is the number infinite?"""
+        if isinstance( n, float ):
+            return n is inf or n is neginf or n.hex() in ('inf','-inf')
+        elif decimal and isinstance( n, decimal.Decimal ):
+            return n.is_infinite()
+        else:
+            return False
 
     @staticmethod
     def isstringtype( obj ):
@@ -2059,9 +2298,15 @@ class decode_statistics(object):
         self.num_nulls = 0
         self.num_undefineds = 0
         self.num_nans = 0
-        self.num_infinites = 0
+        self.num_infinities = 0
         self.num_comments = 0
+        self.num_identifiers = 0  # JavaScript identifiers
         self.num_excess_whitespace = 0
+
+    @property
+    def num_infinites(self):
+        """Misspelled 'num_infinities' for backwards compatibility"""
+        return self.num_infinities
 
     def pretty_description(self, prefix=''):
         import unicodedata
@@ -2113,10 +2358,11 @@ class decode_statistics(object):
 
         lines.extend([
             "Other JavaScript items:",
-            "   NaN:        %5d" % self.num_nans,
-            "   Infinite:   %5d" % self.num_infinites,
-            "   undefined:  %5d" % self.num_undefineds,
-            "   Comments:   %5d" % self.num_comments,
+            "   NaN:         %5d" % self.num_nans,
+            "   Infinite:    %5d" % self.num_infinities,
+            "   undefined:   %5d" % self.num_undefineds,
+            "   Comments:    %5d" % self.num_comments,
+            "   Identifiers: %5d" % self.num_identifiers,
             "Max items in any array: %5d" % self.max_items_in_array,
             "Max keys in any object: %5d" % self.max_items_in_object,
             "Max nesting depth:      %5d" % self.max_depth,
@@ -2310,16 +2556,36 @@ class decode_state(object):
 
     def update_float_stats(self, float_value, **kwargs):
         st = self.stats
+        if 'sign' in kwargs:
+            del kwargs['sign']
+
+        if helpers.is_negzero( float_value ):
+            self.update_negzero_float_stats( **kwargs )
+
+        if helpers.is_infinite( float_value ):
+            st.num_infinities += 1
+
         if isinstance(float_value, decimal.Decimal):
             st.num_floats_decimal += 1
             if st.num_floats_decimal == 1: # Only warn once
                 self.push_cond( self.options.non_portable,
                                 "Floats larger or more precise than an IEEE \"double\" may not be portable",
                                 **kwargs)
-        else:
+        elif isinstance(float_value, float):
             st.num_floats += 1
 
+
     def update_integer_stats(self, int_value, **kwargs ):
+        sign=kwargs.get('sign', 1)
+        if 'sign' in kwargs:
+            del kwargs['sign']
+
+        if int_value == 0 and sign < 0:
+            self.update_negzero_int_stats( **kwargs )
+
+        if sign < 0:
+            int_value = - int_value
+
         st = self.stats
         st.num_ints += 1
         if st.int8_min <= int_value <= st.int8_max:
@@ -2352,6 +2618,19 @@ STRICTNESS_TOLERANT = 'tolerant'
 ALLOW = 'allow'
 WARN = 'warn'
 FORBID = 'forbid'
+
+# For float_type option
+NUMBER_AUTO = 'auto'
+NUMBER_FLOAT = 'float'
+NUMBER_DECIMAL = 'decimal'
+
+# For json_int class
+NUMBER_FORMAT_DECIMAL = 'decimal'
+NUMBER_FORMAT_HEX = 'hex'
+NUMBER_FORMAT_LEGACYOCTAL = 'legacyoctal'
+NUMBER_FORMAT_OCTAL = 'octal'
+NUMBER_FORMAT_BINARY = 'binary'
+
 
 class _behaviors_metaclass(type):
     """Meta class used to establish a set of "behavior" options.
@@ -2596,12 +2875,12 @@ class json_options(object):
         ) # end behavior list
 
     def reset_to_defaults(self):
-        import sys
         self._plain_attrs = ['leading_zero_radix',
                              'encode_namedtuple_as_object',
                              'encode_enum_as',
                              'encode_compactly',
                              'escape_unicode',
+                             'keep_format',
                              'date_format',
                              'datetime_format',
                              'time_format',
@@ -2614,6 +2893,11 @@ class json_options(object):
         self.strictness = STRICTNESS_WARN
         self._leading_zero_radix = 8  # via property: leading_zero_radix
         self._sort_keys = SORT_SMART  # via property: sort_keys
+
+        self.int_as_float = False
+        self.float_type = NUMBER_AUTO
+        self.decimal_context = (decimal.DefaultContext if decimal else None)
+        self.keep_format = False  # keep track of when numbers are hex, octal, etc.
 
         self.encode_namedtuple_as_object = True
         self._encode_enum_as = 'name'  # via property
@@ -2635,7 +2919,7 @@ class json_options(object):
         self.max_items_per_line = 1  # When encoding how many items per array/object
                                      # before breaking into multiple lines
         # For interpreting Python 2 'str' types:
-        if sys.version_info.major == 2:
+        if _py_major == 2:
             self.py2str_encoding = 'ascii'
         else:
             self.py2str_encoding = None
@@ -2678,6 +2962,30 @@ class json_options(object):
             elif kw == 'warnings':
                 if val:
                     self.suppress_warnings()
+            elif kw == 'int_as_float':
+                self.int_as_float = bool(val)
+            elif kw == 'keep_format':
+                self.keep_format = bool(val)
+            elif kw == 'float_type':
+                if val in (NUMBER_AUTO, NUMBER_FLOAT, NUMBER_DECIMAL):
+                    self.float_type = val
+                else:
+                    raise ValueError("Unknown option %r for argument %r to initialize %s" % (val,kw,self.__class__.__name__))
+            elif kw == 'decimal' or kw == 'decimal_context':
+                if decimal:
+                    if not val or val == 'default':
+                        self.decimal_context = decimal.DefaultContext
+                    elif val == 'basic':
+                        self.decimal_context = decimal.BasicContext
+                    elif val == 'extended':
+                        self.decimal_context = decimal.ExtendedContext
+                    elif isinstance(val, decimal.Context):
+                        self.decimal_context = val
+                    elif isinstance(val,(int,long)) or val[0].isdigit:
+                        prec = int(val)
+                        self.decimal_context = decimal.Context( prec=prec )
+                    else:
+                        raise ValueError("Option for %r should be a decimal.Context, a number of significant digits, or one of 'default','basic', or 'extended'." % (kw,))
             elif kw in ('allow','warn','forbid','prevent','deny'):
                 action = {'allow':ALLOW, 'warn':WARN, 'forbid':FORBID, 'prevent':FORBID, 'deny':FORBID}[ kw ]
                 if isinstance(val,basestring):
@@ -2720,7 +3028,6 @@ class json_options(object):
 
         for name in self._plain_attrs:
             setattr(self, name, getattr(other, name))
-
 
     def spaces_to_next_indent_level( self, min_spaces=1, subtract=0 ):
         n = self.indent_amount - subtract
@@ -2795,6 +3102,165 @@ class json_options(object):
         self._encode_enum_as = val
 
     @property
+    def zero_float(self):
+        """The numeric value 0.0, either a float or a decimal."""
+        if decimal and self.float_type == NUMBER_DECIMAL:
+            return self.decimal_context.create_decimal('0.0')
+        else:
+            return 0.0
+    @property
+    def negzero_float(self):
+        """The numeric value -0.0, either a float or a decimal."""
+        if decimal and self.float_type == NUMBER_DECIMAL:
+            return self.decimal_context.create_decimal('-0.0')
+        else:
+            return -0.0
+
+    @property
+    def nan(self):
+        """The numeric value NaN, either a float or a decimal."""
+        if decimal and self.float_type == NUMBER_DECIMAL:
+            return self.decimal_context.create_decimal('NaN')
+        else:
+            return nan
+    @property
+    def inf(self):
+        """The numeric value Infinity, either a float or a decimal."""
+        if decimal and self.float_type == NUMBER_DECIMAL:
+            return self.decimal_context.create_decimal('Infinity')
+        else:
+            return inf
+    @property
+    def neginf(self):
+        """The numeric value -Infinity, either a float or a decimal."""
+        if decimal and self.float_type == NUMBER_DECIMAL:
+            return self.decimal_context.create_decimal('-Infinity')
+        else:
+            return neginf
+
+
+    def make_int( self, s, sign=None, number_format=NUMBER_FORMAT_DECIMAL ):
+        """Makes an integer value according to the current options.
+
+        First argument should be a string representation of the number,
+        or an integer.
+
+        Returns a number value, which could be an int, float, or decimal.
+
+        """
+        if isinstance(sign, (int,long)):
+            if sign < 0:
+                sign = '-'
+            else:
+                sign = '+'
+        if isinstance(s,basestring):
+            if s.startswith('-') or s.startswith('+'):
+                sign = s[0]
+                s = s[1:]
+
+        if self.int_as_float:
+            # Making a float/decimal
+            if isinstance(s, (int,long)):
+                if self.float_type == NUMBER_DECIMAL:
+                    n = self.decimal_context.create_decimal( s )
+                    if sign=='-':
+                        n = n.copy_negate()
+                elif s == 0 and sign=='-':
+                    n = self.negzero_float
+                elif -999999999999999 <= s <= 999999999999999:
+                    n = float(s)
+                    if sign=='-':
+                        n *= -1
+                else:
+                    n = float(s)
+                    if (n == inf or int(n) != s) and self.float_type != NUMBER_FLOAT:
+                        n = self.decimal_context.create_decimal( s )
+                        if sign=='-':
+                            n = n.copy_negate()
+                    elif sign=='-':
+                        n *= -1
+            else: # not already an int
+                n = self.make_float( s, sign )
+                n2 = self.make_float( s[:-1] + ('9' if s[-1]<='5' else '0'), sign )
+                if (n==inf or n==n2) and self.float_type != NUMBER_FLOAT:
+                    n = self.make_decimal( s, sign )
+        elif isinstance( s, (int,long) ):
+            # already an integer
+            n = s
+            if sign=='-':
+                if n == 0:
+                    n = self.negzero_float
+                else:
+                    n *= -1
+        else:
+            # Making an actual integer
+            try:
+                n = int( s )
+            except ValueError:
+                n = self.nan
+            else:
+                if sign=='-':
+                    if n==0:
+                        n = self.negzero_float
+                    else:
+                        n *= -1
+        if isinstance(n,(int,long)) and self.keep_format:
+            n = json_int(n, number_format=number_format)
+        return n
+
+
+    def make_decimal( self, s, sign='+' ):
+        """Converts a string into a decimal or float value."""
+        if not decimal or self.float_type == NUMBER_FLOAT:
+            return self.make_float( s, sign )
+
+        if s.startswith('-') or s.startswith('+'):
+            sign = s[0]
+            s = s[1:]
+        elif isinstance(sign, (int,long)):
+            if sign < 0:
+                sign = '-'
+            else:
+                sign = '+'
+
+        try:
+            f = self.decimal_context.create_decimal( s )
+        except decimal.InvalidOperation:
+            f = self.decimal_context.create_decimal( 'NaN' )
+        except decimal.Overflow:
+            if sign=='-':
+                f = self.decimal_context.create_decimal( '-Infinity' )
+            else:
+                f = self.decimal_context.create_decimal( 'Infinity' )
+        else:
+            if sign=='-':
+                f = f.copy_negate()
+        return f
+
+    def make_float( self, s, sign='+' ):
+        """Converts a string into a float or decimal value."""
+        if decimal and self.float_type == NUMBER_DECIMAL:
+            return self.make_decimal( s, sign )
+
+        if s.startswith('-') or s.startswith('+'):
+            sign = s[0]
+            s = s[1:]
+        elif isinstance(sign, (int,long)):
+            if sign < 0:
+                sign = '-'
+            else:
+                sign = '+'
+
+        try:
+            f = float(s)
+        except ValueError:
+            f = nan
+        else:
+            if sign=='-':
+                f *= -1
+        return f
+
+    @property
     def leading_zero_radix(self):
         """The radix to be used for numbers with leading zeros.  8 or 10
         """
@@ -2838,6 +3304,7 @@ class json_options(object):
             self.set_all_warn()
         elif strict == STRICTNESS_STRICT or strict is True:
             self._strictness = STRICTNESS_STRICT
+            self.keep_format = False
             self.set_all_forbid()
             self.warn_duplicate_keys()
             self.warn_zero_byte()
@@ -3279,26 +3746,27 @@ class JSON(object):
         elif c.isalpha() or c in '_$':
             kw = buf.popwhile( lambda c: c.isalnum() or c in '_$' )
             if kw == 'NaN':
-                state.push_cond( self.options.allow_non_numbers,
+                state.push_cond( self.options.non_numbers,
                                  'NaN literals are not allowed in strict JSON',
                                  position=start_position)
                 state.stats.num_nans += 1
-                return nan
+                return self.options.nan
             elif kw == 'Infinity':
                 state.push_cond( self.options.non_numbers,
                                  'Infinity literals are not allowed in strict JSON',
                                  position=start_position)
-                state.stats.num_infinites += 1
+                state.stats.num_infinities += 1
                 if sign < 0:
-                    return neginf
+                    return self.options.neginf
                 else:
-                    return inf
+                    return self.options.inf
             else:
                 state.push_error('Unknown numeric value keyword', kw, position=start_position)
                 return undefined
 
-        # Check for hex numbers
+        # Check for radix-prefixed numbers
         elif c == '0' and (buf.peek(1) in [u'x',u'X']):
+            # ----- HEX NUMBERS 0x123
             prefix = buf.popstr(2)
             digits = buf.popwhile( helpers.is_hex_digit )
             state.push_cond( self.options.hex_numbers,
@@ -3308,12 +3776,12 @@ class JSON(object):
                 state.push_error('Hexadecimal number is invalid', position=start_position)
                 self.recover_parser(state)
                 return undefined
-            n = sign * helpers.decode_hex( digits )
-            if sign < 0 and n == 0:
-                state.update_negzero_int_stats( position=start_position )
-            state.update_integer_stats( n, position=start_position )
+            ival = helpers.decode_hex( digits )
+            state.update_integer_stats( ival, sign=sign, position=start_position )
+            n = state.options.make_int( ival, sign, number_format=NUMBER_FORMAT_HEX )
             return n
-        elif c == '0' and (buf.peek(1) in [u'o','O']): # New-style octal numbers
+        elif c == '0' and (buf.peek(1) in [u'o','O']):
+            # ----- NEW-STYLE OCTAL NUMBERS  0o123
             prefix = buf.popstr(2)
             digits = buf.popwhile( helpers.is_octal_digit )
             state.push_cond( self.options.octal_numbers,
@@ -3323,12 +3791,12 @@ class JSON(object):
                 state.push_error("Octal number is invalid", position=start_position)
                 self.recover_parser(state)
                 return undefined
-            n = sign * helpers.decode_octal( digits )
-            if sign < 0 and n == 0:
-                state.update_negzero_int_stats( position=start_position )
-            state.update_integer_stats( n, position=start_position )
+            ival = helpers.decode_octal( digits )
+            state.update_integer_stats( ival, sign=sign, position=start_position )
+            n = state.options.make_int( ival, sign, number_format=NUMBER_FORMAT_OCTAL )
             return n
-        elif c == '0' and (buf.peek(1) in [u'b','B']): # New-style binary numbers
+        elif c == '0' and (buf.peek(1) in [u'b','B']):
+            # ----- NEW-STYLE BINARY NUMBERS  0b1101
             prefix = buf.popstr(2)
             digits = buf.popwhile( helpers.is_binary_digit )
             state.push_cond( self.options.binary_numbers,
@@ -3338,13 +3806,13 @@ class JSON(object):
                 state.push_error("Binary number is invalid", position=start_position)
                 self.recover_parser(state)
                 return undefined
-            n = sign * helpers.decode_binary( digits )
-            if sign < 0 and n == 0:
-                state.update_negzero_int_stats( position=start_position )
-            state.update_integer_stats( n, position=start_position )
+            ival = helpers.decode_binary( digits )
+            state.update_integer_stats( ival, sign=sign, position=start_position )
+            n = state.options.make_int( ival, sign, number_format=NUMBER_FORMAT_BINARY )
             return n
         else:
-            # Decimal (or octal) number.  General syntax is:  \d+[\.\d+][e[+-]?\d+]
+            # ----- DECIMAL OR LEGACY-OCTAL NUMBER.   123, 0123
+            # General syntax is:  \d+[\.\d+][e[+-]?\d+]
             number = buf.popwhile( lambda c: c in '0123456789.+-eE' )
             imax = len(number)
             if imax == 0:
@@ -3434,16 +3902,15 @@ class JSON(object):
 
             # Handle legacy octal integers.
             if has_leading_zero and is_integer and self.options.leading_zero_radix == 8:
+                # ----- LEGACY-OCTAL  0123
                 try:
-                    n = sign * helpers.decode_octal( units_s )
+                    ival = helpers.decode_octal( units_s )
                 except ValueError:
                     state.push_error('Bad number, not a valid octal value', number, position=start_position)
                     self.recover_parser(state)
-                    return nan #undefined
-                state.update_integer_stats( n, position=start_position )
-                if n==0 and sign<0:
-                    state.update_negzero_int_stats( position=start_position )
-                    n = -0.0   # preserve negative zero
+                    return self.options.nan # undefined
+                state.update_integer_stats( ival, sign=sign, position=start_position )
+                n = state.options.make_int( ival, sign, number_format=NUMBER_FORMAT_LEGACYOCTAL )
                 return n
 
             # Determine the exponential part
@@ -3461,39 +3928,24 @@ class JSON(object):
 
             # Try to make an int/long first.
             if not saw_decimal_point and exponent >= 0:
-                # An integer
-                n = int(units_s) * sign
+                # ----- A DECIMAL INTEGER
+                ival = int(units_s)
                 if exponent != 0:
-                    n *= 10**exponent
-                if n == 0 and sign < 0:
-                    # minus zero, must preserve negative sign so make a float
-                    state.update_negzero_int_stats( position=start_position )
-                    n = -0.0
+                    ival *= 10**exponent
+                state.update_integer_stats( ival, sign=sign, position=start_position )
+                n = state.options.make_int( ival, sign )
             else:
+                # ----- A FLOATING-POINT NUMBER
                 try:
-                    if decimal and (abs(exponent) > float_maxexp or sigdigits > float_sigdigits):
-                        try:
-                            n = decimal.Decimal(number)
-                            n = n.normalize()
-                        except decimal.Overflow:
-                            if sign < 0:
-                                n = neginf
-                            else:
-                                n = inf
-                        else:
-                            n *= sign
+                    if exponent < float_minexp or exponent > float_maxexp or sigdigits > float_sigdigits:
+                        n = state.options.make_decimal( number, sign )
                     else:
-                        n = float(number) * sign
-                    if n==0.0 and sign<0:
-                        state.update_negzero_float_stats( position=start_position )
+                        n = state.options.make_float( number, sign )
                 except ValueError as err:
                     state.push_error('Bad number, %s' % err.message, number, position=start_position)
                     n = undefined
-
-            if isinstance(n,(int,long)):
-                state.update_integer_stats( n, position=start_position )
-            else:
-                state.update_float_stats( n, position=start_position )
+                else:
+                    state.update_float_stats( n, sign=sign, position=start_position )
             return n
 
 
@@ -3513,12 +3965,27 @@ class JSON(object):
                 raise JSONEncodeError('Can not encode a complex number that has a non-zero imaginary part',n)
             n = n.real
 
+        if isinstance(n, json_int):
+            state.append( n.json_format() )
+            return
+
         if isinstance(n, (int,long)):
             state.append( str(n) )
             return
 
         if decimal and isinstance(n, decimal.Decimal):
-            state.append( str(n) )
+            if n.is_nan():  # Could be 'NaN' or 'sNaN'
+                state.append( 'NaN' )
+            elif n.is_infinite():
+                if n.is_signed():
+                    state.append( '-Infinity' )
+                else:
+                    state.append( 'Infinity' )
+            else:
+                s = str(n).lower()
+                if 'e' not in s and '.' not in s:
+                    s = s + '.0'
+                state.append( s )
             return
 
         global nan, inf, neginf
@@ -3539,6 +4006,7 @@ class JSON(object):
             elif 'nan' in reprn or n is nan:
                 state.append( 'NaN' )
             else:
+                # A normal float.
                 state.append( repr(n) )
         else:
             raise TypeError('encode_number expected an integral, float, or decimal number type',type(n))
@@ -3654,7 +4122,7 @@ class JSON(object):
                     if n < 128:
                         _append( chr(n) )
                     else:
-                        _append( unichr(n) )
+                        _append( helpers.safe_unichr(n) )
                 elif escapes.has_key(c):
                     buf.skip()
                     _append( escapes[c] )
@@ -3748,7 +4216,7 @@ class JSON(object):
                         _append( u'\ufffd' ) # replacement char
                     else:
                         # Other chars go in as a unicode char
-                        _append( unichr(codepoint) )
+                        _append( helpers.safe_unichr(codepoint) )
                 else:
                     # Unknown escape sequence
                     state.push_cond( self.options.nonescape_characters,
@@ -3837,7 +4305,7 @@ class JSON(object):
         # Must handle instances of UserString specially in order to be
         # able to use ord() on it's simulated "characters".  Also
         # convert Python2 'str' types to unicode strings first.
-        import unicodedata
+        import unicodedata, sys
         import UserString
         py2strenc = self.options.py2str_encoding
         if isinstance(s, UserString.UserString):
@@ -3894,11 +4362,29 @@ class JSON(object):
                 chunks.append(r'\u%04x' % cord)
                 i += 1
             elif 0xD800 <= cord <= 0xDFFF:
-                # A raw surrogate character!  This should never happen
-                # and there's no way to include it in the JSON output.
-                # So all we can do is complain.
-                cname = 'U+%04X' % cord
-                raise JSONEncodeError('can not include or escape a Unicode surrogate character',cname)
+                # A raw surrogate character!
+                # This should ONLY happen in "narrow" Python builds
+                # where (sys.maxunicode == 65535) as Python itself
+                # uses UTF-16.  But for "wide" Python builds, a raw
+                # surrogate should never happen.
+                handled_raw_surrogates = False
+                if sys.maxunicode == 0xFFFF and 0xD800 <= cord <=  0xDBFF and (i+1) < imax:
+                    # In a NARROW Python, output surrogate pair as-is
+                    hsurrogate = cord
+                    i += 1
+                    if tochar:
+                        c = tochar(s[i])
+                    else:
+                        c = s[i]
+                    cord = ord(c)
+                    i += 1
+                    if 0xDC00 <= cord <= 0xDFFF:
+                        lsurrogate = cord
+                        chunks.append(r'\u%04x\u%04x' % (hsurrogate,lsurrogate))
+                        handled_raw_surrogates = True
+                if not handled_raw_surrogates:
+                    cname = 'U+%04X' % cord
+                    raise JSONEncodeError('can not include or escape a Unicode surrogate character',cname)
             elif cord <= 0xFFFF:
                 # Other BMP Unicode character
                 if unicodedata.category( c ) in ['Cc','Cf','Zl','Zp']:
@@ -3949,15 +4435,19 @@ class JSON(object):
             state.push_error("Expected an identifier", position=start_position)
         elif kw == 'null':
             obj = None
+            state.stats.num_nulls += 1
         elif kw == 'true':
             obj = True
+            state.stats.num_bools += 1
         elif kw == 'false':
             obj = False
+            state.stats.num_bools += 1
         elif kw == 'undefined':
             state.push_cond( self.options.undefined_values,
                              "Strict JSON does not allow the 'undefined' keyword",
                              kw, position=start_position)
             obj = undefined
+            state.stats.num_undefineds += 1
         elif kw == 'NaN' or kw == 'Infinity':
             state.push_cond( self.options.non_numbers,
                              "%s literals are not allowed in strict JSON" % kw,
@@ -3984,10 +4474,10 @@ class JSON(object):
                     return val
             if kw == 'NaN':
                 state.stats.num_nans += 1
-                obj = nan
+                obj = state.options.nan
             else:
-                state.stats.num_infinites += 1
-                obj = inf
+                state.stats.num_infinities += 1
+                obj = state.options.inf
         else:
             # Convert unknown identifiers into strings
             if identifier_as_string:
@@ -3997,10 +4487,12 @@ class JSON(object):
                 state.push_cond( self.options.identifier_keys,
                                  "JSON does not allow identifiers to be used as strings",
                                  kw, position=start_position)
+                state.stats.num_identifiers += 1
                 obj = self.decode_javascript_identifier( kw )
             else:
                 state.push_error("Unknown identifier", kw, position=start_position)
                 obj = undefined
+                state.stats.num_identifiers += 1
         return obj
 
 
@@ -4126,6 +4618,8 @@ class JSON(object):
                                              outer_position=start_position,
                                              context='Array')
                             obj.append( undefined )
+                            if state.stats:
+                                state.stats.num_undefineds += 1
                     buf.skip() # skip over comma
                     saw_value = False
                     continue
@@ -4437,7 +4931,14 @@ class JSON(object):
         if buf.at_end:
             state.push_error('No value to decode')
         else:
-            state.obj = self.decodeobj(state, at_document_start=True )
+            if state.options.decimal_context:
+                dec_ctx = decimal.localcontext( state.options.decimal_context )
+            else:
+                dec_ctx = _dummy_context_manager
+
+            with dec_ctx:
+                state.obj = self.decodeobj(state, at_document_start=True )
+
             if not state.should_stop:
                 # Make sure there's nothing at the end
                 self.skipws(state)
@@ -4445,7 +4946,7 @@ class JSON(object):
                     state.push_error('Unexpected text after end of JSON value')
 
     def _classify_for_encoding( self, obj ):
-        import sys, datetime
+        import datetime
         c = 'other'
         if obj is None:
             c = 'null'
@@ -4481,9 +4982,9 @@ class JSON(object):
                 c = 'time'
             elif isinstance(obj, datetime.timedelta):
                 c = 'timedelta'
-            elif sys.version_info.major >= 3 and isinstance(obj,(bytes,bytearray)):
+            elif _py_major >= 3 and isinstance(obj,(bytes,bytearray)):
                 c = 'bytes'
-            elif sys.version_info.major >= 3 and isinstance(obj,memoryview):
+            elif _py_major >= 3 and isinstance(obj,memoryview):
                 c = 'memoryview'
             elif _enum is not None and isinstance(obj,_enum):
                 c = 'enum'
@@ -5174,6 +5675,65 @@ def decode( txt, encoding=None, **kwargs ):
             write_stats.write( "%s----- End of JSON statistics\n" % filename_for_errors )
     return result
 
+
+
+def encode_to_file( filename, obj, encoding='utf-8', overwrite=False, **kwargs ):
+    """Encodes a Python object into JSON and writes into the given file.
+
+    If no encoding is given, then UTF-8 will be used.
+
+    See the encode() function for a description of other possible options.
+
+    If the file already exists and the 'overwrite' option is not set
+    to True, then the existing file will not be overwritten.  (Note,
+    there is a subtle race condition in the check so there are
+    possible conditions in which a file may be overwritten)
+
+    """
+    import os, errno
+    if not encoding:
+        encoding = 'utf-8'
+
+    if not isinstance(filename,basestring) or not filename:
+        raise TypeError("Expected a file name")
+
+    if not overwrite and os.path.exists(filename):
+        raise IOError(errno.EEXIST, "File exists: %r" % filename)
+
+    jsondata = encode( obj, encoding=encoding, **kwargs )
+
+    try:
+        fp = open(filename, 'wb')
+    except Exception:
+        raise
+    else:
+        try:
+            fp.write( jsondata )
+        finally:
+            fp.close()
+
+
+def decode_file( filename, encoding=None, **kwargs ):
+    """Decodes JSON found in the given file.
+
+    See the decode() function for a description of other possible options.
+
+    """
+    if isinstance(filename,basestring):
+        try:
+            fp = open(filename, 'rb')
+        except Exception:
+            raise
+        else:
+            try:
+                jsondata = fp.read()
+            finally:
+                fp.close()
+    else:
+        raise TypeError("Expected a file name")
+    return decode( jsondata, encoding=encoding, **kwargs )
+
+
 # ======================================================================
 
 class jsonlint(object):
@@ -5225,6 +5785,8 @@ REFORMATTING OPTIONS:
  -o filename | --output filename
         The filename to which reformatted JSON is to be written.
         Without this option the standard output is used.
+
+ --[no-]keep-format   Try to preserve numeric radix, e.g., hex, octal, etc.
 
  --sort <kind>     How to sort object/dictionary keys, <kind> is one of:
 %(sort_options_help)s
@@ -5454,6 +6016,8 @@ MORE INFORMATION:
         kwoptions = {  # Will be used to initialize json_options
             "sort_keys": SORT_SMART,
             "strict": STRICTNESS_WARN,
+            "keep_format": True,
+            "decimal_context": 100,
             }
     
         try:
@@ -5469,6 +6033,8 @@ MORE INFORMATION:
                                          'sort=',
                                          'recursion-limit=',
                                          'leading-zero-radix=',
+                                         'keep-format',
+                                         'no-keep-format',
                                          'indent=',
                                          'indent-amount=',
                                          'indent-limit=',
@@ -5547,6 +6113,7 @@ the options --allow, --warn, or --forbid ; for example:
                 verbose = False
             elif opt in ('-s', '--strict'):
                 kwoptions['strict'] = STRICTNESS_STRICT
+                kwoptions['keep_format'] = False
             elif opt in ('-S', '--nonstrict'):
                 kwoptions['strict'] = STRICTNESS_TOLERANT
             elif opt in ('-W', '--tolerant'):
@@ -5576,6 +6143,10 @@ the options --allow, --warn, or --forbid ; for example:
                     kwoptions[action] += "," + val
                 else:
                     kwoptions[action] = val
+            elif opt in ('--keep-format',):
+                kwoptions['keep_format']=True
+            elif opt in ('--no-keep-format',):
+                kwoptions['keep_format']=False
             elif opt == '--leading-zero-radix':
                 kwoptions['leading_zero_radix'] = val
             elif opt in ('--indent', '--indent-amount'):
@@ -5629,6 +6200,7 @@ the options --allow, --warn, or --forbid ; for example:
                 return 1
 
         # Make the JSON options
+        kwoptions['decimal_context'] = 100
         jsonopts = json_options( **kwoptions )
 
         # Now decode each file...

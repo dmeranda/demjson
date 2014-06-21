@@ -1,6 +1,162 @@
 Change history for demjson python module.
 
 
+Version 2.2 released 2014-06-20
+=================================
+    [Note, version 2.1 was never released.]
+
+This release fixes compatibility with Python 2.6 and any Python
+compiled with narrow-Unicode; fixes bugs with statistics; adds new
+file I/O convenience functions; as well as adding many new
+enhancements concerning the treatment of numbers and floating-point
+values.
+
+* Python 2.6 support is now fixed (tested with 2.6.9).
+
+* Narrow-Unicode: demjson now works correctly when used with a Python
+  that was compiled with narrow-Unicode (BMP only) support; i.e., when
+  sys.maxunicode == 0xFFFF.
+
+  Note that narrow-Pythons simulate non-BMP characters as a UTF-16
+  surrogate-pair encoding; so string lengths, ord(), and other such
+  operations on Python strings may be surprising:
+
+      len( u"\U00010030" )    # => 1 for wide-Pythons
+      len( u"\U00010030" )    # => 2 for narrow-Pythons
+
+  With this release you may encode and decode any Unicode character,
+  including non-BMP characters, with demjson just as if Python was
+  compiled for wide-Unicode.
+
+* Statistics bug: In certain cases some of the decoding statistics
+  results -- obtained by passing 'return_stats=True' to the decode()
+  function -- were not getting set with the correct count. For example
+  the 'num_bools' item may not have reflected the total number of
+  'true' or 'false' identifiers appearing in the JSON document.  This
+  has now been fixed, and more thorough test cases added to the test
+  suite.
+
+* Negative NaN bug: Fixed a bug when decoding the JavaScript literal
+  "-NaN" (a negative NaN) that caused a decoding error.  Now it
+  correctly produces a Python equivalent NaN (not-a-number) value.
+  Since the sign of a NaN is insignificant, encountering a "-NaN"
+  which would have triggered the bug was quite unlikely.
+
+* decode_file: A convenience function 'decode_file()' has been added
+  which wraps the 'decode()' function and which reads the JSON
+  document from a file.  It will correctly open the file in binary
+  mode and insure the file is closed.  All other options supported
+  by deocde() can be passed.
+
+      data = decode_file( "sample.json", allow_comments=True )
+
+* encode_to_file: A convenience function 'encode_to_file()' has been
+  added which wraps the 'encode()' function and which writes the
+  resultant JSON document into a file.  It will correctly open the
+  file in binary mode and insure it is properly closed.
+
+  By default encode the JSON will be encoded as UTF-8 unless otherwise
+  specified with the 'encoding' option. All other options supported by
+  encode() can be passed.
+
+  This function will also refuse to overwrite any existing file
+  unless the 'overwrite' option is set to True.
+
+      encode_to_file( "sample.json", data, overwrite=True )
+
+* Number radix: When reformatting with jsonlint, in non-strict mode,
+  the original radix of numbers will be preserved (controlled with the
+  '--[no]-keep-format' option).  If a number in a JSON/JavaScript text
+  was hex (0x1C), octal (0o177, 0177), or binary (0b1011); then it
+  will stay in that format rather than being converted to decimal.
+
+      $ echo '[10, 0xA, 012, 0b1010]' | jsonlint -f --nonstrict
+      [
+        10,
+        0xa,
+        012,
+        0b1010
+      ]
+
+  Correspondinly, in the decode() function there is a new option
+  'keep_format' that when True will return non-decimal integer values
+  as a type 'json_int'; which is a subclass of the standard int, but
+  that additionally remembers the original radix format (hex,etc.).
+
+* Integer as Float: There is a new option, int_as_float, that allows
+  you to decode all numbers as floating point rather than
+  distinguishing integers from floats.  This allows you to parse JSON
+  exactly as JavaScript would do, as it lacks an integer type.
+
+      demjson.decode( '123', int_as_float=True )   # =>  123.0
+
+* Float vs Decimal: You can now control the promotion of 'float' to
+  'decimal.Decimal' numbers. Normally demjson will try to keep
+  floating-point numbers as the Python 'float' type, unless there is
+  an overflow or loss of precision, in which case it will use
+  'decimal.Decimal' instead.  The new option 'float_type' can control
+  this type selection:
+
+      float_type = demjson.NUMBER_AUTO     # The default
+      float_type = demjson.NUMBER_DECIMAL  # Always use decimal
+      float_type = demjson.NUMBER_FLOAT    # Always use float
+
+  Do note that if using NUMBER_FLOAT -- which disables the promotion
+  to the decimal.Decimal type -- that besides possible loss of
+  precision (significant digits) that numeric underflow or overflow
+  can also occur.  So very large numbers may result in 'inf'
+  (infinity) and small numbers either in subnormal values or even just
+  zero.
+
+  Normally when demjson encounters the JavaScript keywords 'NaN',
+  'Infinity', and '-Infinity' it will decode them as the Python float
+  equivalent (demjson.nan, demjson.inf, and demjson.neginf).  However
+  if you use NUMBER_DECIMAL then these will be converted to decimal
+  equivalents instead: Decimal('NaN'), Decimal('Infinity'), and
+  Decimal('-Infinity').
+
+* Significant digits: When reformatting JSON, the jsonlint command
+  will now try to preserve all significant digits present in
+  floating-point numbers when possible.
+
+     $ echo "3.141592653589793238462643383279502884197169399375105820974944592307816406286" | \
+       jsonlint -f --quiet
+
+     3.141592653589793238462643383279502884197169399375105820974944592307816406286
+
+* Decimal contexts: The Python 'decimal' module allows the user
+  to establish different "contexts", which among other things can
+  change the number of significant digits kept, the maximum exponent
+  value, and so on.  If the default context is not sufficient (which
+  allows 23 significant digits), you can tell demjson to use a
+  different context by setting the option 'decimal_context'.  It
+  may take several values:
+
+      'default'   -- Use Python's default:  decimal.DefaultContext
+      'basic'     -- Use Python's basic:    decimal.BasicContext
+      'extended'  -- Use Python's extended: decimal.ExtendedContext
+      123         -- Creates a context with the number of significant digits.
+      <context>   -- Any instance of the class decimal.Context.
+
+  This option is only available in the programming interface and is not
+  directly exposed by the jsonlint command.
+
+      import decimal, demjson
+
+      myctx = decimal.Context( prec=50, rounding=decimal.ROUND_DOWN )
+      data = demjson.decode_file( "data.json", decimal_context=myctx )
+
+  Note that Python's Decimal class will try to "store" all the
+  significant digits originally present, including excess tailing
+  zeros.  However any excess digits beyond the context's configuration
+  will be lost as soon as any operation is performed on the value.
+
+
+Version 2.1 - NOT RELEASED
+============================
+n/a
+
+
 Version 2.0.1 released 2014-05-26
 =================================
 This is a re-packaging of 2.0, after discovering problems with

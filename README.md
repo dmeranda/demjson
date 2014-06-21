@@ -14,6 +14,10 @@ unnecessary whitespace.
 
 What's new
 ==========
+<b>Version 2.2</b> fixes compatibility with Python 2.6 and
+narrow-Unicode Pythons, fixes bugs with statistics, and adds many
+enhancements to the treatment of numbers and floating-point values.
+
 <b>Version 2.0.1</b> is a re-packaging of 2.0, after discovering
 problems with incorrect checksums in the PyPI distribution of 2.0.  No
 changes were made from 2.0.

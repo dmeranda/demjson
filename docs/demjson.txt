@@ -120,6 +120,8 @@ DESCRIPTION
          <http://www.cs.berkeley.edu/~ejr/Projects/ieee754/>
 
 CLASSES
+    __builtin__.long(__builtin__.object)
+        json_int
     __builtin__.object
         JSON
         buffered_stream
@@ -1423,6 +1425,9 @@ CLASSES
      |  __weakref__
      |      list of weak references to the object (if defined)
      |  
+     |  num_infinites
+     |      Misspelled 'num_infinities' for backwards compatibility
+     |  
      |  ----------------------------------------------------------------------
      |  Data and other attributes defined here:
      |  
@@ -1529,6 +1534,15 @@ CLASSES
      |  is_hex_digit(c)
      |      Determines if the given character is a valid hexadecimal digit (0-9, a-f, A-F).
      |  
+     |  is_infinite(n)
+     |      Is the number infinite?
+     |  
+     |  is_nan(n)
+     |      Is the number a NaN (not-a-number)?
+     |  
+     |  is_negzero(n)
+     |      Is the number value a negative zero?
+     |  
      |  is_octal_digit(c)
      |      Determines if the given character is a valid octal digit (0-7).
      |  
@@ -1545,6 +1559,12 @@ CLASSES
      |  
      |  make_raw_bytes(byte_list)
      |      Constructs a byte array (bytes in Python 3, str in Python 2) from a list of byte values (0-255).
+     |  
+     |  make_surrogate_pair(codepoint)
+     |      Given a Unicode codepoint (int) returns a 2-tuple of surrogate codepoints.
+     |  
+     |  safe_unichr(codepoint)
+     |      Just like Python's unichr() but works in narrow-Unicode Pythons.
      |  
      |  strip_format_control_chars(txt)
      |      Filters out all Unicode format control characters from the string.
@@ -1611,9 +1631,220 @@ CLASSES
      |  
      |  javascript_reserved_words = frozenset(['break', 'case', 'catch', 'clas...
      |  
+     |  maxunicode = 1114111
+     |  
      |  octaldigits = '01234567'
      |  
+     |  sys = <module 'sys' (built-in)>
+     |  
      |  unsafe_string_chars = u'\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\x...
+    
+    class json_int(__builtin__.long)
+     |  A subclass of the Python int/long that remembers its format (hex,octal,etc).
+     |  
+     |  Initialize it the same as an int, but also accepts an additional keyword
+     |  argument 'number_format' which should be one of the NUMBER_FORMAT_* values.
+     |  
+     |      n = json_int( x[, base, number_format=NUMBER_FORMAT_DECIMAL] )
+     |  
+     |  Method resolution order:
+     |      json_int
+     |      __builtin__.long
+     |      __builtin__.object
+     |  
+     |  Methods defined here:
+     |  
+     |  json_format(self)
+     |      Returns the integer value formatted as a JSON literal
+     |  
+     |  ----------------------------------------------------------------------
+     |  Static methods defined here:
+     |  
+     |  __new__(cls, *args, **kwargs)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  number_format
+     |      The original radix format of the number
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from __builtin__.long:
+     |  
+     |  __abs__(...)
+     |      x.__abs__() <==> abs(x)
+     |  
+     |  __add__(...)
+     |      x.__add__(y) <==> x+y
+     |  
+     |  __and__(...)
+     |      x.__and__(y) <==> x&y
+     |  
+     |  __cmp__(...)
+     |      x.__cmp__(y) <==> cmp(x,y)
+     |  
+     |  __coerce__(...)
+     |      x.__coerce__(y) <==> coerce(x, y)
+     |  
+     |  __div__(...)
+     |      x.__div__(y) <==> x/y
+     |  
+     |  __divmod__(...)
+     |      x.__divmod__(y) <==> divmod(x, y)
+     |  
+     |  __float__(...)
+     |      x.__float__() <==> float(x)
+     |  
+     |  __floordiv__(...)
+     |      x.__floordiv__(y) <==> x//y
+     |  
+     |  __format__(...)
+     |  
+     |  __getattribute__(...)
+     |      x.__getattribute__('name') <==> x.name
+     |  
+     |  __getnewargs__(...)
+     |  
+     |  __hash__(...)
+     |      x.__hash__() <==> hash(x)
+     |  
+     |  __hex__(...)
+     |      x.__hex__() <==> hex(x)
+     |  
+     |  __index__(...)
+     |      x[y:z] <==> x[y.__index__():z.__index__()]
+     |  
+     |  __int__(...)
+     |      x.__int__() <==> int(x)
+     |  
+     |  __invert__(...)
+     |      x.__invert__() <==> ~x
+     |  
+     |  __long__(...)
+     |      x.__long__() <==> long(x)
+     |  
+     |  __lshift__(...)
+     |      x.__lshift__(y) <==> x<<y
+     |  
+     |  __mod__(...)
+     |      x.__mod__(y) <==> x%y
+     |  
+     |  __mul__(...)
+     |      x.__mul__(y) <==> x*y
+     |  
+     |  __neg__(...)
+     |      x.__neg__() <==> -x
+     |  
+     |  __nonzero__(...)
+     |      x.__nonzero__() <==> x != 0
+     |  
+     |  __oct__(...)
+     |      x.__oct__() <==> oct(x)
+     |  
+     |  __or__(...)
+     |      x.__or__(y) <==> x|y
+     |  
+     |  __pos__(...)
+     |      x.__pos__() <==> +x
+     |  
+     |  __pow__(...)
+     |      x.__pow__(y[, z]) <==> pow(x, y[, z])
+     |  
+     |  __radd__(...)
+     |      x.__radd__(y) <==> y+x
+     |  
+     |  __rand__(...)
+     |      x.__rand__(y) <==> y&x
+     |  
+     |  __rdiv__(...)
+     |      x.__rdiv__(y) <==> y/x
+     |  
+     |  __rdivmod__(...)
+     |      x.__rdivmod__(y) <==> divmod(y, x)
+     |  
+     |  __repr__(...)
+     |      x.__repr__() <==> repr(x)
+     |  
+     |  __rfloordiv__(...)
+     |      x.__rfloordiv__(y) <==> y//x
+     |  
+     |  __rlshift__(...)
+     |      x.__rlshift__(y) <==> y<<x
+     |  
+     |  __rmod__(...)
+     |      x.__rmod__(y) <==> y%x
+     |  
+     |  __rmul__(...)
+     |      x.__rmul__(y) <==> y*x
+     |  
+     |  __ror__(...)
+     |      x.__ror__(y) <==> y|x
+     |  
+     |  __rpow__(...)
+     |      y.__rpow__(x[, z]) <==> pow(x, y[, z])
+     |  
+     |  __rrshift__(...)
+     |      x.__rrshift__(y) <==> y>>x
+     |  
+     |  __rshift__(...)
+     |      x.__rshift__(y) <==> x>>y
+     |  
+     |  __rsub__(...)
+     |      x.__rsub__(y) <==> y-x
+     |  
+     |  __rtruediv__(...)
+     |      x.__rtruediv__(y) <==> y/x
+     |  
+     |  __rxor__(...)
+     |      x.__rxor__(y) <==> y^x
+     |  
+     |  __sizeof__(...)
+     |      Returns size in memory, in bytes
+     |  
+     |  __str__(...)
+     |      x.__str__() <==> str(x)
+     |  
+     |  __sub__(...)
+     |      x.__sub__(y) <==> x-y
+     |  
+     |  __truediv__(...)
+     |      x.__truediv__(y) <==> x/y
+     |  
+     |  __trunc__(...)
+     |      Truncating an Integral returns itself.
+     |  
+     |  __xor__(...)
+     |      x.__xor__(y) <==> x^y
+     |  
+     |  bit_length(...)
+     |      long.bit_length() -> int or long
+     |      
+     |      Number of bits necessary to represent self in binary.
+     |      >>> bin(37L)
+     |      '0b100101'
+     |      >>> (37L).bit_length()
+     |      6
+     |  
+     |  conjugate(...)
+     |      Returns self, the complex conjugate of any long.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from __builtin__.long:
+     |  
+     |  denominator
+     |      the denominator of a rational number in lowest terms
+     |  
+     |  imag
+     |      the imaginary part of a complex number
+     |  
+     |  numerator
+     |      the numerator of a rational number in lowest terms
+     |  
+     |  real
+     |      the real part of a complex number
     
     class json_options(__builtin__.object)
      |  Options to determine how strict the decoder or encoder should be.
@@ -1816,6 +2047,20 @@ CLASSES
      |  is_all(self, value)
      |      Determines if all the behaviors have the given value.
      |  
+     |  make_decimal(self, s, sign='+')
+     |      Converts a string into a decimal or float value.
+     |  
+     |  make_float(self, s, sign='+')
+     |      Converts a string into a float or decimal value.
+     |  
+     |  make_int(self, s, sign=None, number_format='decimal')
+     |      Makes an integer value according to the current options.
+     |      
+     |      First argument should be a string representation of the number,
+     |      or an integer.
+     |      
+     |      Returns a number value, which could be an int, float, or decimal.
+     |  
      |  reset_to_defaults(self)
      |  
      |  set_all(self, value)
@@ -1984,6 +2229,9 @@ CLASSES
      |  
      |  identifier_keys
      |      JavaScript identifiers are converted to strings when used as object keys
+     |  
+     |  inf
+     |      The numeric value Infinity, either a float or a decimal.
      |  
      |  initial_decimal_point
      |      Floating-point numbers may start with a decimal point (no units digit)
@@ -2242,6 +2490,15 @@ CLASSES
      |  leading_zeros
      |      Numbers may have leading zeros
      |  
+     |  nan
+     |      The numeric value NaN, either a float or a decimal.
+     |  
+     |  neginf
+     |      The numeric value -Infinity, either a float or a decimal.
+     |  
+     |  negzero_float
+     |      The numeric value -0.0, either a float or a decimal.
+     |  
      |  non_numbers
      |      Non-numbers may be used, such as NaN or Infinity
      |  
@@ -2288,6 +2545,9 @@ CLASSES
      |  
      |  zero_byte
      |      Strings may contain U+0000, which may not be safe for C-based programs
+     |  
+     |  zero_float
+     |      The numeric value 0.0, either a float or a decimal.
      |  
      |  ----------------------------------------------------------------------
      |  Data and other attributes defined here:
@@ -2717,8 +2977,52 @@ FUNCTIONS
         
         See the hooks documentation on the JSON.set_hook() method.
     
+    decode_file(filename, encoding=None, **kwargs)
+        Decodes JSON found in the given file.
+        
+        See the decode() function for a description of other possible options.
+    
+    determine_float_limits(number_type=<type 'float'>)
+        Determines the precision and range of the given float type.
+        
+        The passed in 'number_type' argument should refer to the type of
+        floating-point number.  It should either be the built-in 'float',
+        or decimal context or constructor; i.e., one of:
+        
+            # 1. FLOAT TYPE
+            determine_float_limits( float )
+        
+            # 2. DEFAULT DECIMAL CONTEXT
+            determine_float_limits( decimal.Decimal )
+        
+            # 3. CUSTOM DECIMAL CONTEXT
+            ctx = decimal.Context( prec=75 )
+            determine_float_limits( ctx )
+        
+        Returns a named tuple with components:
+        
+             ( significant_digits,
+               max_exponent,
+               min_exponent )
+        
+        Where:
+            * significant_digits -- maximum number of *decimal* digits
+                 that can be represented without any loss of precision.
+                 This is conservative, so if there are 16 1/2 digits, it
+                 will return 16, not 17.
+        
+            * max_exponent -- The maximum exponent (power of 10) that can
+                 be represented before an overflow (or rounding to
+                 infinity) occurs.
+        
+            * min_exponent -- The minimum exponent (negative power of 10)
+                 that can be represented before either an underflow
+                 (rounding to zero) or a subnormal result (loss of
+                 precision) occurs.  Note this is conservative, as
+                 subnormal numbers are excluded.
+    
     determine_float_precision()
-        Returns a tuple (significant_digits, max_exponent) for the float type.
+        # For backwards compatibility with older demjson versions:
     
     encode(obj, encoding=None, **kwargs)
         Encodes a Python object into a JSON-encoded string.
@@ -2786,6 +3090,18 @@ FUNCTIONS
         \u escaped. Additionaly any characters not in the output encoding
         repertoire for the encoding codec will be \u escaped as well.
     
+    encode_to_file(filename, obj, encoding='utf-8', overwrite=False, **kwargs)
+        Encodes a Python object into JSON and writes into the given file.
+        
+        If no encoding is given, then UTF-8 will be used.
+        
+        See the encode() function for a description of other possible options.
+        
+        If the file already exists and the 'overwrite' option is not set
+        to True, then the existing file will not be overwritten.  (Note,
+        there is a subtle race condition in the check so there are
+        possible conditions in which a file may be overwritten)
+    
     extend_and_flatten_list_with_sep(orig_seq, extension_seq, separator='')
     
     extend_list_with_sep(orig_seq, extension_seq, sepchar='')
@@ -2799,6 +3115,14 @@ FUNCTIONS
 DATA
     ALLOW = 'allow'
     FORBID = 'forbid'
+    NUMBER_AUTO = 'auto'
+    NUMBER_DECIMAL = 'decimal'
+    NUMBER_FLOAT = 'float'
+    NUMBER_FORMAT_BINARY = 'binary'
+    NUMBER_FORMAT_DECIMAL = 'decimal'
+    NUMBER_FORMAT_HEX = 'hex'
+    NUMBER_FORMAT_LEGACYOCTAL = 'legacyoctal'
+    NUMBER_FORMAT_OCTAL = 'octal'
     SORT_ALPHA = 'alpha'
     SORT_ALPHA_CI = 'alpha_ci'
     SORT_NONE = 'none'
@@ -2810,14 +3134,15 @@ DATA
     WARN = 'warn'
     __author__ = 'Deron Meranda <http://deron.meranda.us/>'
     __credits__ = 'Copyright (c) 2006-2014 Deron E. Meranda <http:/.../lic...
-    __date__ = '2014-05-26'
+    __date__ = '2014-06-20'
     __homepage__ = 'http://deron.meranda.us/python/demjson/'
-    __version__ = '2.0.1'
-    __version_info__ = version_info(major=2, minor=0, micro=1)
+    __version__ = '2.2'
+    __version_info__ = version_info(major=2, minor=2, micro=0)
     content_type = 'application/json'
     file_ext = 'json'
-    float_maxexp = 307
-    float_sigdigits = 14
+    float_maxexp = 308
+    float_minexp = -308
+    float_sigdigits = 16
     inf = inf
     nan = nan
     neginf = -inf
@@ -2825,14 +3150,14 @@ DATA
     sorting_methods = {'alpha': 'Sort strictly alphabetically', 'alpha_ci'...
     syntax_error = demjson.undefined
     undefined = demjson.undefined
-    version = '2.0.1'
-    version_info = version_info(major=2, minor=0, micro=1)
+    version = '2.2'
+    version_info = version_info(major=2, minor=2, micro=0)
 
 VERSION
-    2.0.1
+    2.2
 
 DATE
-    2014-05-26
+    2014-06-20
 
 AUTHOR
     Deron Meranda <http://deron.meranda.us/>

@@ -27,11 +27,31 @@ import demjson
 # ------------------------------
 # Python version-specific stuff...
 
-is_python3 = (sys.version_info.major >= 3)
+is_python3 = False
+is_python27_plus = False
+try:
+    is_python3 = (sys.version_info.major >= 3)
+    is_python27_plus = (sys.version_info.major > 2 or (sys.version_info.major==2 and sys.version_info.minor >= 7))
+except AttributeError:
+    is_python3 = (sys.version_info[0] >= 3)
+    is_python27_plus = (sys.version_info[0] > 2 or (sys.version_info[0]==2 and sys.version_info[1] >= 7))
+
+is_wide_python = (sys.maxunicode > 0xFFFF)
+
+try:
+    import decimal
+except ImportError:
+    decimal = None
+
+# ====================
 
 if hasattr(unittest, 'skipUnless'):
     def skipUnlessPython3(method):
         return unittest.skipUnless(method, is_python3)
+    def skipUnlessPython27(method):
+        return unittest.skipUnless(method, is_python27_plus)
+    def skipUnlessWidePython(method):
+        return unittest.skipUnless(method, is_wide_python)
 else:
     # Python <= 2.6 does not have skip* decorators, so
     # just make a dummy decorator that always passes the
@@ -41,6 +61,42 @@ else:
             print "\nSKIPPING TEST %s: Requires Python 3" % method.__name__
             return True
         return always_pass
+    def skipUnlessPython27(method):
+        def always_pass(self):
+            print "\nSKIPPING TEST %s: Requires Python 2.7 or greater" % method.__name__
+            return True
+        return always_pass
+    def skipUnlessWidePython(method):
+        def always_pass(self):
+            print "\nSKIPPING TEST %s: Requires Python with wide Unicode support (maxunicode > U+FFFF)" % method.__name__
+            return True
+        return always_pass
+
+## ------------------------------
+
+def is_negzero( n ):
+    if isinstance(n,float):
+        return n == -0.0 and repr(n).startswith('-')
+    elif decimal and isinstance(n,decimal.Decimal):
+        return n.is_zero() and n.is_signed()
+    else:
+        return False
+
+def is_nan( n ):
+    if isinstance(n,float):
+        return n.hex() == 'nan'
+    elif decimal and isinstance(n,decimal.Decimal):
+        return n.is_nan()
+    else:
+        return False
+
+def is_infinity( n ):
+    if isinstance(n,float):
+        return n.hex() in ('inf', '-inf')
+    elif decimal and isinstance(n,decimal.Decimal):
+        return n.is_infinite()
+    else:
+        return False
 
 ## ------------------------------
 
@@ -220,12 +276,28 @@ class DemjsonTest(unittest.TestCase):
                 pass
 
     def testDecodeHexNumbers(self):
+        self.assertEqual(demjson.decode('0x0', allow_hex_numbers=True), 0)
+        self.assertEqual(demjson.decode('0X0', allow_hex_numbers=True), 0)
+        self.assertEqual(demjson.decode('0x0000', allow_hex_numbers=True), 0)
         self.assertEqual(demjson.decode('0x8', allow_hex_numbers=True), 8)
         self.assertEqual(demjson.decode('0x1f', allow_hex_numbers=True), 31)
         self.assertEqual(demjson.decode('0x1F', allow_hex_numbers=True), 31)
         self.assertEqual(demjson.decode('0xff', allow_hex_numbers=True), 255)
         self.assertEqual(demjson.decode('0xffff', allow_hex_numbers=True), 65535)
         self.assertEqual(demjson.decode('0xffffffff', allow_hex_numbers=True), 4294967295)
+        self.assertEqual(demjson.decode('0x0F1a7Cb', allow_hex_numbers=True), 0xF1A7CB)
+        self.assertEqual(demjson.decode('0X0F1a7Cb', allow_hex_numbers=True), 0xF1A7CB)
+        self.assertEqual(demjson.decode('0x0000000000000000000000000000000000123', allow_hex_numbers=True), 0x123)
+        self.assertEqual(demjson.decode('0x000000000000000000000000000000000012300', allow_hex_numbers=True), 0x12300)
+        self.assert_( is_negzero(demjson.decode('-0x0', allow_hex_numbers=True)),
+                      "Decoding negative zero hex numbers should give -0.0" )
+        self.assertEqual(demjson.decode('-0x1', allow_hex_numbers=True), -1)
+        self.assertEqual(demjson.decode('-0x000Fc854ab', allow_hex_numbers=True), -0xFC854AB)
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '0x', allow_hex_numbers=True)
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '0xG', allow_hex_numbers=True)
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '0x-3', allow_hex_numbers=True)
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '0x3G', allow_hex_numbers=True)
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '0x0x3', allow_hex_numbers=True)
 
     def testDecodeLargeIntegers(self):
         self.assertEqual(demjson.decode('9876543210123456789'), 9876543210123456789)
@@ -240,6 +312,53 @@ class DemjsonTest(unittest.TestCase):
     def testDecodeOctalNumbers(self):
         self.assertEqual(demjson.decode('017', allow_leading_zeros=True, leading_zero_radix=8), 15)
         self.assertRaises(demjson.JSONDecodeError, demjson.decode, '018', allow_leading_zeros=True, leading_zero_radix=8)
+        self.assertEqual(demjson.decode('00017', allow_leading_zeros=True, leading_zero_radix=8), 15)
+        self.assertEqual(demjson.decode('-017', allow_leading_zeros=True, leading_zero_radix=8), -15)
+        self.assertEqual(demjson.decode('00', allow_leading_zeros=True, leading_zero_radix=8), 0)
+        self.assert_( is_negzero(demjson.decode('-00', allow_leading_zeros=True, leading_zero_radix=8)),
+                     "Decoding negative zero octal number should give -0.0")
+
+    def testDecodeNewOctalNumbers(self):
+        self.assertEqual(demjson.decode('0o0'), 0)
+        self.assertEqual(demjson.decode('0O0'), 0)
+        self.assertEqual(demjson.decode('0o000'), 0)
+        self.assertEqual(demjson.decode('0o1'), 1)
+        self.assertEqual(demjson.decode('0o7'), 7)
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '0o18')
+        self.assertEqual(demjson.decode('0o17'), 15)
+        self.assertEqual(demjson.decode('-0o17'), -15)
+        self.assertEqual(demjson.decode('0o4036517'), 1064271)
+        self.assertEqual(demjson.decode('0O4036517'), 1064271)
+        self.assertEqual(demjson.decode('0o000000000000000000000000000000000000000017'), 15)
+        self.assertEqual(demjson.decode('0o00000000000000000000000000000000000000001700'), 960)
+        self.assert_( is_negzero(demjson.decode('-0o0')),
+                     "Decoding negative zero octal number should give -0.0")
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '0o')
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '0oA')
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '0o-3')
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '0o3A')
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '0o0o3')
+
+    def testDecodeBinaryNumbers(self):
+        self.assertEqual(demjson.decode('0b0'), 0)
+        self.assertEqual(demjson.decode('0B0'), 0)
+        self.assertEqual(demjson.decode('0b000'), 0)
+        self.assertEqual(demjson.decode('0b1'), 1)
+        self.assertEqual(demjson.decode('0b01'), 1)
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '0b2')
+        self.assertEqual(demjson.decode('0b1101'), 13)
+        self.assertEqual(demjson.decode('-0b1101'), -13)
+        self.assertEqual(demjson.decode('0b11010001101111100010101101011'), 439862635),
+        self.assertEqual(demjson.decode('0B11010001101111100010101101011'), 439862635),
+        self.assertEqual(demjson.decode('0b00000000000000000000000000000000000000001101'), 13)
+        self.assertEqual(demjson.decode('0b0000000000000000000000000000000000000000110100'), 52)
+        self.assert_( is_negzero(demjson.decode('-0b0')),
+                     "Decoding negative zero binary number should give -0.0")
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '0b')
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '0bA')
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '0b-1')
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '0b1A')
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, '0b0b1')
 
     def testDecodeNegativeZero(self):
         """Makes sure 0 and -0 are distinct.
@@ -253,6 +372,38 @@ class DemjsonTest(unittest.TestCase):
                      'Numbers 0.0 and -0.0 are not distinct')
         self.assert_(demjson.decode('0') is not demjson.decode('-0'),
                      'Numbers 0 and -0 are not distinct')
+
+    def testDecodeNaN(self):
+        """Checks parsing of JavaScript NaN.
+        """
+        # Have to use is_nan(), since by definition nan != nan
+        self.assert_( isinstance(demjson.decode('NaN', allow_non_numbers=True), float) )
+        self.assert_( is_nan(demjson.decode('NaN', allow_non_numbers=True)) )
+        self.assert_( is_nan(demjson.decode('+NaN', allow_non_numbers=True)) )
+        self.assert_( is_nan(demjson.decode('-NaN', allow_non_numbers=True)) )
+        if decimal:
+            self.assert_( isinstance(demjson.decode('NaN', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL), decimal.Decimal) )
+            self.assert_( is_nan(demjson.decode('NaN', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL)) )
+            self.assert_( is_nan(demjson.decode('+NaN', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL)) )
+            self.assert_( is_nan(demjson.decode('-NaN', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL)) )
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, 'NaN', allow_non_numbers=False)
+
+    def testDecodeInfinite(self):
+        """Checks parsing of JavaScript Infinite.
+        """
+        # Have to use is_nan(), since by definition nan != nan
+        self.assert_( isinstance(demjson.decode('Infinity', allow_non_numbers=True), float) )
+        self.assert_( is_infinity(demjson.decode('Infinity', allow_non_numbers=True)) )
+        self.assert_( is_infinity(demjson.decode('+Infinity', allow_non_numbers=True)) )
+        self.assert_( is_infinity(demjson.decode('-Infinity', allow_non_numbers=True)) )
+        self.assert_( demjson.decode('-Infinity', allow_non_numbers=True) < 0 )
+        if decimal:
+            self.assert_( isinstance(demjson.decode('Infinity', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL), decimal.Decimal) )
+            self.assert_( is_infinity(demjson.decode('Infinity', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL)) )
+            self.assert_( is_infinity(demjson.decode('+Infinity', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL)) )
+            self.assert_( is_infinity(demjson.decode('-Infinity', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL)) )
+            self.assert_( demjson.decode('-Infinity', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL).is_signed() )
+        self.assertRaises(demjson.JSONDecodeError, demjson.decode, 'Infinity', allow_non_numbers=False)
 
     def assertMatchesRegex(self, value, pattern, msg=None):
         import re
@@ -312,6 +463,88 @@ class DemjsonTest(unittest.TestCase):
     def testEncodeNegativeZero(self):
         self.assert_(demjson.encode(-0.0) in ['-0','-0.0'],
                      'Float -0.0 is not encoded as a negative zero')
+        if decimal:
+            self.assert_(demjson.encode( decimal.Decimal('-0') ) in ['-0','-0.0'],
+                         'Decimal -0 is not encoded as a negative zero')
+
+    def testJsonInt(self):
+        self.assert_( isinstance( demjson.json_int(0), (int,long) ) )
+        self.assertEqual(demjson.json_int(0), 0)
+        self.assertEqual(demjson.json_int(555999), 555999)
+        self.assertEqual(demjson.json_int(-555999), -555999)
+        self.assertEqual(demjson.json_int(12131415161718191029282726), 12131415161718191029282726)
+        self.assertEqual(demjson.json_int('123'), 123)
+        self.assertEqual(demjson.json_int('+123'), 123)
+        self.assertEqual(demjson.json_int('-123'), -123)
+        self.assertEqual(demjson.json_int('123',8), 83)
+        self.assertEqual(demjson.json_int('123',16), 291)
+        self.assertEqual(demjson.json_int('110101',2), 53)
+        self.assertEqual( 123, demjson.json_int(123,number_format=demjson.NUMBER_FORMAT_DECIMAL))
+        self.assertEqual( 123, demjson.json_int(123,number_format=demjson.NUMBER_FORMAT_HEX))
+        self.assertEqual( 123, demjson.json_int(123,number_format=demjson.NUMBER_FORMAT_OCTAL))
+        self.assertEqual( 123, demjson.json_int(123,number_format=demjson.NUMBER_FORMAT_LEGACYOCTAL))
+        self.assertEqual( 123, demjson.json_int(123,number_format=demjson.NUMBER_FORMAT_BINARY))
+        self.assertEqual(demjson.json_int(123), demjson.json_int(123,number_format=demjson.NUMBER_FORMAT_DECIMAL))
+        self.assertEqual(demjson.json_int(123), demjson.json_int(123,number_format=demjson.NUMBER_FORMAT_HEX))
+        self.assertEqual(demjson.json_int(123), demjson.json_int(123,number_format=demjson.NUMBER_FORMAT_OCTAL))
+        self.assertEqual(demjson.json_int(123), demjson.json_int(123,number_format=demjson.NUMBER_FORMAT_LEGACYOCTAL))
+        self.assertEqual(demjson.json_int(123), demjson.json_int(123,number_format=demjson.NUMBER_FORMAT_BINARY))
+        self.assertEqual(demjson.json_int(123).json_format(), '123' )
+        self.assertEqual(demjson.json_int(123,number_format=demjson.NUMBER_FORMAT_DECIMAL).json_format(), '123' )
+        self.assertEqual(demjson.json_int(123,number_format=demjson.NUMBER_FORMAT_HEX).json_format(), '0x7b' )
+        self.assertEqual(demjson.json_int(123,number_format=demjson.NUMBER_FORMAT_OCTAL).json_format(), '0o173' )
+        self.assertEqual(demjson.json_int(123,number_format=demjson.NUMBER_FORMAT_LEGACYOCTAL).json_format(), '0173' )
+        self.assertEqual(demjson.json_int(0,number_format=demjson.NUMBER_FORMAT_LEGACYOCTAL).json_format(), '0' )
+        self.assertEqual(demjson.json_int(123,number_format=demjson.NUMBER_FORMAT_BINARY).json_format(), '0b1111011' )
+
+    def testEncodeDecimalIntegers(self):
+        self.assertEqual(demjson.encode( demjson.json_int(0)), '0')
+        self.assertEqual(demjson.encode( demjson.json_int(123)), '123')
+        self.assertEqual(demjson.encode( demjson.json_int(-123)), '-123')
+        self.assertEqual(demjson.encode( demjson.json_int(12345678901234567890888)), '12345678901234567890888')
+
+    def testEncodeHexIntegers(self):
+        self.assertEqual(demjson.encode( demjson.json_int(0x0,number_format=demjson.NUMBER_FORMAT_HEX)), '0x0')
+        self.assertEqual(demjson.encode( demjson.json_int(0xff,number_format=demjson.NUMBER_FORMAT_HEX)), '0xff')
+        self.assertEqual(demjson.encode( demjson.json_int(-0x7f,number_format=demjson.NUMBER_FORMAT_HEX)), '-0x7f')
+        self.assertEqual(demjson.encode( demjson.json_int(0x123456789abcdef,number_format=demjson.NUMBER_FORMAT_HEX)), '0x123456789abcdef')
+
+    def testEncodeOctalIntegers(self):
+        self.assertEqual(demjson.encode( demjson.json_int(0,number_format=demjson.NUMBER_FORMAT_OCTAL)), '0o0')
+        self.assertEqual(demjson.encode( demjson.json_int(359,number_format=demjson.NUMBER_FORMAT_OCTAL)), '0o547')
+        self.assertEqual(demjson.encode( demjson.json_int(-359,number_format=demjson.NUMBER_FORMAT_OCTAL)), '-0o547')
+
+    def testEncodeLegacyOctalIntegers(self):
+        self.assertEqual(demjson.encode( demjson.json_int(0,number_format=demjson.NUMBER_FORMAT_LEGACYOCTAL)), '0')
+        self.assertEqual(demjson.encode( demjson.json_int(1,number_format=demjson.NUMBER_FORMAT_LEGACYOCTAL)), '01')
+        self.assertEqual(demjson.encode( demjson.json_int(359,number_format=demjson.NUMBER_FORMAT_LEGACYOCTAL)), '0547')
+        self.assertEqual(demjson.encode( demjson.json_int(-359,number_format=demjson.NUMBER_FORMAT_LEGACYOCTAL)), '-0547')
+
+    def testIntAsFloat(self):
+        self.assertEqual(demjson.decode('[0,-5,600,0xFF]', int_as_float=True), [0.0,-5.0,600.0,255.0] )
+        if decimal:
+            self.assertEqual(demjson.decode('[0,-5,600,0xFF]', int_as_float=True, float_type=demjson.NUMBER_DECIMAL),
+                             [decimal.Decimal(0.0), decimal.Decimal(-5.0), decimal.Decimal(600.0), decimal.Decimal(255.0)] )
+            self.assertEqual([type(x) for x in demjson.decode('[0,-5,600,0xFF]', int_as_float=True, float_type=demjson.NUMBER_DECIMAL)],
+                             [decimal.Decimal, decimal.Decimal, decimal.Decimal, decimal.Decimal] )
+
+    def testKeepFormat(self):
+        self.assertEqual(demjson.encode(demjson.decode( '[3,03,0o3,0x3,0b11]', keep_format=True )), '[3,03,0o3,0x3,0b11]' )
+
+    def testEncodeNaN(self):
+        self.assertEqual(demjson.encode( demjson.nan ), 'NaN')
+        self.assertEqual(demjson.encode( -demjson.nan ), 'NaN')
+        if decimal:
+            self.assertEqual(demjson.encode( decimal.Decimal('NaN') ), 'NaN')
+            self.assertEqual(demjson.encode( decimal.Decimal('sNaN') ), 'NaN')
+
+    def testEncodeInfinity(self):
+        self.assertEqual(demjson.encode( demjson.inf ), 'Infinity')
+        self.assertEqual(demjson.encode( -demjson.inf ), '-Infinity')
+        self.assertEqual(demjson.encode( demjson.neginf ), '-Infinity')
+        if decimal:
+            self.assertEqual(demjson.encode( decimal.Decimal('Infinity') ), 'Infinity')
+            self.assertEqual(demjson.encode( decimal.Decimal('-Infinity') ), '-Infinity')
 
     def testDecodeString(self):
         self.assertEqual(demjson.decode(r'""'), '')
@@ -917,6 +1150,7 @@ class DemjsonTest(unittest.TestCase):
         self.assertEqual(demjson.encode( d, sort_keys=demjson.SORT_SMART ),
                          '{"apple":1,"Ball":1,"cat":1,"dog1":1,"dog002":1,"DOG03":1,"dog10":1}' )
 
+    @skipUnlessPython27
     def testEncodeDictPreserveSorting(self):
         import collections
         d = collections.OrderedDict()
@@ -967,9 +1201,9 @@ class DemjsonTest(unittest.TestCase):
             else:
                 raise demjson.JSONSkipHook
 
-        v = {'ten':10, 'number': complex(3, 7.1), 'asof': datetime.date(2014,1,17)}
+        v = {'ten':10, 'number': complex(3, 7.25), 'asof': datetime.date(2014,1,17)}
         self.assertEqual(demjson.encode( v, encode_value=enc_val ),
-                         u'{"ASOF":"YEAR 2014 MONTH 01 DAY 17","NUMBER":{"IMAGINARY":7.1,"REAL":3.0},"TEN":10}' )
+                         u'{"ASOF":"YEAR 2014 MONTH 01 DAY 17","NUMBER":{"IMAGINARY":7.25,"REAL":3.0},"TEN":10}' )
 
     def testEncodeDefault(self):
         import datetime
@@ -1034,8 +1268,224 @@ class DemjsonTest(unittest.TestCase):
 
         self.assertEqual(demjson.decode( '[1,2,3]', decode_number=jack_in_the_box), [1,2,3] )
 
+
+    def decode_stats(self, data, *args, **kwargs):
+        """Runs demjson.decode() and returns the statistics object."""
+        kwargs['return_stats'] = True
+        res = demjson.decode( data, *args, **kwargs )
+        if res:
+            return res.stats
+        return None
+
+    def testStatsSimple(self):
+        self.assertEqual( self.decode_stats( '1' ).num_ints, 1 )
+        self.assertEqual( self.decode_stats( '3.14' ).num_floats, 1 )
+        self.assertEqual( self.decode_stats( 'true' ).num_bools, 1 )
+        self.assertEqual( self.decode_stats( 'false' ).num_bools, 1 )
+        self.assertEqual( self.decode_stats( 'null' ).num_nulls, 1 )
+        self.assertEqual( self.decode_stats( '"hello"' ).num_strings, 1 )
+        self.assertEqual( self.decode_stats( '[]' ).num_arrays, 1 )
+        self.assertEqual( self.decode_stats( '{}' ).num_objects, 1 )
+        self.assertEqual( self.decode_stats( '1//HI' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( '1/*HI*/' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( 'NaN' ).num_nans, 1 )
+        self.assertEqual( self.decode_stats( 'Infinity' ).num_infinities, 1 )
+        self.assertEqual( self.decode_stats( '-Infinity' ).num_infinities, 1 )
+        self.assertEqual( self.decode_stats( 'undefined' ).num_undefineds, 1 )
+        self.assertEqual( self.decode_stats( '[,1,2]' ).num_undefineds, 1 )
+        self.assertEqual( self.decode_stats( '[1,,2]' ).num_undefineds, 1 )
+        self.assertEqual( self.decode_stats( '[1,2,]' ).num_undefineds, 0 )
+        self.assertEqual( self.decode_stats( '{hello:1}' ).num_identifiers, 1 )
+        self.assertEqual( self.decode_stats( '[1,{"a":2},[{"b":{"c":[4,[[5]],6]}},7],8]' ).max_depth, 7 )
+
+    def testStatsWhitespace(self):
+        self.assertEqual( self.decode_stats( '1' ).num_excess_whitespace, 0 )
+        self.assertEqual( self.decode_stats( ' 1' ).num_excess_whitespace, 1 )
+        self.assertEqual( self.decode_stats( '1 ' ).num_excess_whitespace, 1 )
+        self.assertEqual( self.decode_stats( ' 1 ' ).num_excess_whitespace, 2 )
+        self.assertEqual( self.decode_stats( '[1, 2]' ).num_excess_whitespace, 1 )
+        self.assertEqual( self.decode_stats( '[1  , 2]' ).num_excess_whitespace, 3 )
+        self.assertEqual( self.decode_stats( '[  1, 2]' ).num_excess_whitespace, 3 )
+        self.assertEqual( self.decode_stats( '[1, 2  ]' ).num_excess_whitespace, 3 )
+        self.assertEqual( self.decode_stats( '{"a": 1}' ).num_excess_whitespace, 1 )
+        self.assertEqual( self.decode_stats( '{"a"  : 1}' ).num_excess_whitespace, 3 )
+        self.assertEqual( self.decode_stats( '{ "a": 1}' ).num_excess_whitespace, 2 )
+        self.assertEqual( self.decode_stats( '{"a": 1  }' ).num_excess_whitespace, 3 )
+        self.assertEqual( self.decode_stats( '{"a":1,"b":2}' ).num_excess_whitespace, 0 )
+        self.assertEqual( self.decode_stats( '{"a":1,  "b":2}' ).num_excess_whitespace, 2 )
+        self.assertEqual( self.decode_stats( '{"a":1  ,"b":2}' ).num_excess_whitespace, 2 )
+        self.assertEqual( self.decode_stats( '{"a":1 ,  "b":2}' ).num_excess_whitespace, 3 )
+        self.assertEqual( self.decode_stats( '\n[\t1 , \t2 ]\n' ).num_excess_whitespace, 7 )
+
+
+    def testStatsArrays(self):
+        self.assertEqual( self.decode_stats( '123' ).num_arrays, 0 )
+        self.assertEqual( self.decode_stats( '[]' ).num_arrays, 1 )
+        self.assertEqual( self.decode_stats( '[1,2]' ).num_arrays, 1 )
+        self.assertEqual( self.decode_stats( '{"a":[1,2]}' ).num_arrays, 1 )
+        self.assertEqual( self.decode_stats( '[1,[2],3]' ).num_arrays, 2 )
+        self.assertEqual( self.decode_stats( '[[[1,[],[[]],4],[3]]]' ).num_arrays, 7 )
+        self.assertEqual( self.decode_stats( '123' ).max_depth, 0 )
+        self.assertEqual( self.decode_stats( '[123]' ).max_items_in_array, 1 )
+        self.assertEqual( self.decode_stats( '[[[1,[],[[]],4],[3]]]' ).max_depth, 5 )
+        self.assertEqual( self.decode_stats( '123' ).max_items_in_array, 0 )
+        self.assertEqual( self.decode_stats( '[]' ).max_items_in_array, 0 )
+        self.assertEqual( self.decode_stats( '[[[[[[[]]]]]]]' ).max_items_in_array, 1 )
+        self.assertEqual( self.decode_stats( '[[[[],[[]]],[]]]' ).max_items_in_array, 2 )
+        self.assertEqual( self.decode_stats( '[[[1,[],[[]],4],[3]]]' ).max_items_in_array, 4 )
+
+    def testStatsObjects(self):
+        self.assertEqual( self.decode_stats( '123' ).num_objects, 0 )
+        self.assertEqual( self.decode_stats( '{}' ).num_objects, 1 )
+        self.assertEqual( self.decode_stats( '{"a":1}' ).num_objects, 1 )
+        self.assertEqual( self.decode_stats( '[{"a":1}]' ).num_objects, 1 )
+        self.assertEqual( self.decode_stats( '{"a":1,"b":2}' ).num_objects, 1 )
+        self.assertEqual( self.decode_stats( '{"a":{}}' ).num_objects, 2 )
+        self.assertEqual( self.decode_stats( '{"a":{"b":null}}' ).num_objects, 2 )
+        self.assertEqual( self.decode_stats( '{"a":{"b":{"c":false}},"d":{}}' ).num_objects, 4 )
+        self.assertEqual( self.decode_stats( '123' ).max_depth, 0 )
+        self.assertEqual( self.decode_stats( '{}' ).max_depth, 1 )
+        self.assertEqual( self.decode_stats( '{"a":{"b":{"c":false}},"d":{}}' ).max_depth, 3 )
+        self.assertEqual( self.decode_stats( '123' ).max_items_in_object, 0 )
+        self.assertEqual( self.decode_stats( '{}' ).max_items_in_object, 0 )
+        self.assertEqual( self.decode_stats( '{"a":1}' ).max_items_in_object, 1 )
+        self.assertEqual( self.decode_stats( '{"a":1,"b":2}' ).max_items_in_object, 2 )
+        self.assertEqual( self.decode_stats( '{"a":{"b":{"c":false}},"d":{}}' ).max_items_in_object, 2 )
+
+    def testStatsIntegers(self):
+        n8s = [0,1,127,-127,-128]  # -128..127
+        n16s = [128,255,32767,-129,-32768]  # -32768..32767
+        n32s = [32768,2147483647,-32769,-2147483648] # -2147483648..2147483647
+        n64s = [2147483648,9223372036854775807,-2147483649,-9223372036854775808]# -9223372036854775808..9223372036854775807
+        nxls = [9223372036854775808,-9223372036854775809,10**20,-10**20]
+        allnums = []
+        allnums.extend(n8s)
+        allnums.extend(n16s)
+        allnums.extend(n32s)
+        allnums.extend(n64s)
+        allnums.extend(nxls)
+        alljson = '[' + ','.join([str(n) for n in allnums]) + ']'
+
+        self.assertEqual( self.decode_stats( 'true' ).num_ints, 0 )
+        self.assertEqual( self.decode_stats( '1' ).num_ints, 1 )
+        self.assertEqual( self.decode_stats( '[1,2,"a",3]' ).num_ints, 3 )
+        self.assertEqual( self.decode_stats( '[1,2,{"a":3}]' ).num_ints, 3 )
+        self.assertEqual( self.decode_stats( alljson ).num_ints_8bit, len(n8s) )
+        self.assertEqual( self.decode_stats( alljson ).num_ints_16bit, len(n16s) )
+        self.assertEqual( self.decode_stats( alljson ).num_ints_32bit, len(n32s) )
+        self.assertEqual( self.decode_stats( alljson ).num_ints_64bit, len(n64s) )
+        self.assertEqual( self.decode_stats( alljson ).num_ints_long, len(nxls) )
+
+        n53s = [-9007199254740992,-9007199254740991, 9007199254740991,9007199254740992]# -9007199254740991..9007199254740991
+        self.assertEqual( self.decode_stats( repr(n53s) ).num_ints_53bit, 2 )
+
+    def testStatsFloats(self):
+        self.assertEqual( self.decode_stats( 'true' ).num_floats, 0 )
+        self.assertEqual( self.decode_stats( '1' ).num_floats, 0 )
+        self.assertEqual( self.decode_stats( '1.1' ).num_floats, 1 )
+        self.assertEqual( self.decode_stats( '1e-8' ).num_floats, 1 )
+        self.assertEqual( self.decode_stats( '[1.0,2.0,{"a":-3.0}]' ).num_floats, 3 )
+        self.assertEqual( self.decode_stats( '0.0' ).num_negative_zero_floats, 0 )
+        self.assertEqual( self.decode_stats( '-0.0' ).num_negative_zero_floats, 1 )
+        self.assertEqual( self.decode_stats( '-0.0', float_type=demjson.NUMBER_DECIMAL ).num_negative_zero_floats, 1 )
+        self.assertEqual( self.decode_stats( '-1.0e-500', float_type=demjson.NUMBER_FLOAT ).num_negative_zero_floats, 1 )
+        self.assertEqual( self.decode_stats( '1.0e500', float_type=demjson.NUMBER_FLOAT ).num_infinities, 1 )
+        self.assertEqual( self.decode_stats( '-1.0e500', float_type=demjson.NUMBER_FLOAT ).num_infinities, 1 )
+        if decimal:
+            self.assertEqual( self.decode_stats( '3.14e100' ).num_floats_decimal, 0 )
+            self.assertEqual( self.decode_stats( '3.14e500' ).num_floats_decimal, 1 )
+            self.assertEqual( self.decode_stats( '3.14e-500' ).num_floats_decimal, 1 )
+            self.assertEqual( self.decode_stats( '3.14159265358979' ).num_floats_decimal, 0 )
+            self.assertEqual( self.decode_stats( '3.141592653589793238462643383279502884197169399375105820974944592307816406286' ).num_floats_decimal, 1 )
+
+
+    def testStatsStrings(self):
+        self.assertEqual( self.decode_stats( 'true' ).num_strings, 0 )
+        self.assertEqual( self.decode_stats( '""' ).num_strings, 1 )
+        self.assertEqual( self.decode_stats( '"abc"' ).num_strings, 1 )
+        self.assertEqual( self.decode_stats( '["a","b",null,{"c":"d","e":42}]' ).num_strings, 5 )
+        self.assertEqual( self.decode_stats( '""' ).max_string_length, 0 )
+        self.assertEqual( self.decode_stats( '""' ).total_string_length, 0 )
+        self.assertEqual( self.decode_stats( '"abc"' ).max_string_length, 3 )
+        self.assertEqual( self.decode_stats( '"abc"' ).total_string_length, 3 )
+        self.assertEqual( self.decode_stats( r'"\u2020"' ).max_string_length, 1 )
+        self.assertEqual( self.decode_stats( u'"\u2020"' ).max_string_length, 1 )
+        self.assertEqual( self.decode_stats( u'"\U0010ffff"' ).max_string_length, 1 )
+        self.assertEqual( self.decode_stats( r'"\ud804\udc88"' ).max_string_length, 1 )
+        self.assertEqual( self.decode_stats( '["","abc","defghi"]' ).max_string_length, 6 )
+        self.assertEqual( self.decode_stats( '["","abc","defghi"]' ).total_string_length, 9 )
+        self.assertEqual( self.decode_stats( '""' ).min_codepoint, None )
+        self.assertEqual( self.decode_stats( '""' ).max_codepoint, None )
+        self.assertEqual( self.decode_stats( r'"\0"' ).min_codepoint, 0 )
+        self.assertEqual( self.decode_stats( r'"\0"' ).max_codepoint, 0 )
+        self.assertEqual( self.decode_stats( r'"\u0000"' ).min_codepoint, 0 )
+        self.assertEqual( self.decode_stats( r'"\u0000"' ).max_codepoint, 0 )
+        self.assertEqual( self.decode_stats( u'"\u0000"' ).min_codepoint, 0 )
+        self.assertEqual( self.decode_stats( u'"\u0000"' ).max_codepoint, 0 )
+        self.assertEqual( self.decode_stats( r'"\1"' ).min_codepoint, 1 )
+        self.assertEqual( self.decode_stats( r'"\1"' ).max_codepoint, 1 )
+        self.assertEqual( self.decode_stats( r'"\u0001"' ).min_codepoint, 1 )
+        self.assertEqual( self.decode_stats( r'"\u0001"' ).max_codepoint, 1 )
+        self.assertEqual( self.decode_stats( r'"\ud804\udc88"' ).min_codepoint, 69768 )
+        self.assertEqual( self.decode_stats( r'"\ud804\udc88"' ).max_codepoint, 69768 )
+        self.assertEqual( self.decode_stats( r'"\u60ccABC\u0001"' ).min_codepoint, 1 )
+        self.assertEqual( self.decode_stats( r'"\u60ccABC\u0001"' ).max_codepoint, 0x60cc )
+        self.assertEqual( self.decode_stats( r'"\377"' ).min_codepoint, 255 )
+        self.assertEqual( self.decode_stats( r'"\377"' ).max_codepoint, 255 )
+        self.assertEqual( self.decode_stats( r'"\uffff"' ).min_codepoint, 0xffff )
+        self.assertEqual( self.decode_stats( r'"\uffff"' ).max_codepoint, 0xffff )
+        self.assertEqual( self.decode_stats( u'"\uffff"' ).min_codepoint, 0xffff )
+        self.assertEqual( self.decode_stats( u'"\uffff"' ).max_codepoint, 0xffff )
+        self.assertEqual( self.decode_stats( '["mnoapj","kzcde"]' ).min_codepoint, ord('a') )
+        self.assertEqual( self.decode_stats( '["mnoapj","kzcde"]' ).max_codepoint, ord('z') )
+        self.assertEqual( self.decode_stats( u'"\U0010ffff"' ).min_codepoint, 0x10ffff )
+        self.assertEqual( self.decode_stats( u'"\U0010ffff"' ).max_codepoint, 0x10ffff )
+
+    def testStatsComments(self):
+        self.assertEqual( self.decode_stats( 'true' ).num_comments, 0 )
+        self.assertEqual( self.decode_stats( '/**/true' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( '/*hi*/true' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( 'true/*hi*/' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( '/*hi*/true/*there*/' ).num_comments, 2 )
+        self.assertEqual( self.decode_stats( 'true//' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( 'true//\n' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( 'true//hi' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( 'true//hi\n' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( '//hi\ntrue' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( '/**//**/true' ).num_comments, 2 )
+        self.assertEqual( self.decode_stats( '/**/ /**/true' ).num_comments, 2 )
+        self.assertEqual( self.decode_stats( 'true//hi/*there*/\n' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( 'true/*hi//there*/' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( 'true/*hi\nthere\nworld*/' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( 'true/*hi\n//there\nworld*/' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( 'true/*ab*cd*/' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( '"abc/*HI*/xyz"' ).num_comments, 0 )
+        self.assertEqual( self.decode_stats( '[1,2]' ).num_comments, 0 )
+        self.assertEqual( self.decode_stats( '[/*hi*/1,2]' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( '[1/*hi*/,2]' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( '[1,/*hi*/2]' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( '[1,2/*hi*/]' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( '{"a":1,"b":2}' ).num_comments, 0 )
+        self.assertEqual( self.decode_stats( '{/*hi*/"a":1,"b":2}' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( '{"a"/*hi*/:1,"b":2}' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( '{"a":/*hi*/1,"b":2}' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( '{"a":1/*hi*/,"b":2}' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( '{"a":1,/*hi*/"b":2}' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( '{"a":1,"b"/*hi*/:2}' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( '{"a":1,"b":/*hi*/2}' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( '{"a":1,"b":2/*hi*/}' ).num_comments, 1 )
+        self.assertEqual( self.decode_stats( '//\n[/*A*/1/**/,/*\n\n*/2/*C\n*///D\n]//' ).num_comments, 7 )
+
+    def testStatsIdentifiers(self):
+        self.assertEqual( self.decode_stats( 'true' ).num_identifiers, 0 )
+        self.assertEqual( self.decode_stats( '{"a":2}' ).num_identifiers, 0 )
+        self.assertEqual( self.decode_stats( '{a:2}' ).num_identifiers, 1 )
+        self.assertEqual( self.decode_stats( '{a:2,xyz:4}' ).num_identifiers, 2 )
+
+
 def run_all_tests():
-    print 'Running with demjson version', demjson.__version__
+    unicode_width = 'narrow' if sys.maxunicode<=0xFFFF else 'wide'
+    print 'Running with demjson version %s, Python version %s with %s-Unicode' % (demjson.__version__, sys.version.split(' ',1)[0],unicode_width)
     if int( demjson.__version__.split('.',1)[0] ) < 2:
         print 'WARNING: TESTING AGAINST AN OLD VERSION!'
     unittest.main()
