@@ -36,6 +36,7 @@ REFORMATTING OPTIONS:
         Without this option the standard output is used.
 
  --[no-]keep-format   Try to preserve numeric radix, e.g., hex, octal, etc.
+ --html-safe          Escape characters that are not safe to embed in HTML/XML.
 
  --sort <kind>     How to sort object/dictionary keys, <kind> is one of:
                  alpha - Sort strictly alphabetically

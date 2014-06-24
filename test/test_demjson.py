@@ -524,7 +524,7 @@ class DemjsonTest(unittest.TestCase):
         self.assertEqual(demjson.decode('[0,-5,600,0xFF]', int_as_float=True), [0.0,-5.0,600.0,255.0] )
         if decimal:
             self.assertEqual(demjson.decode('[0,-5,600,0xFF]', int_as_float=True, float_type=demjson.NUMBER_DECIMAL),
-                             [decimal.Decimal(0.0), decimal.Decimal(-5.0), decimal.Decimal(600.0), decimal.Decimal(255.0)] )
+                             [decimal.Decimal('0.0'), decimal.Decimal('-5.0'), decimal.Decimal('600.0'), decimal.Decimal('255.0')] )
             self.assertEqual([type(x) for x in demjson.decode('[0,-5,600,0xFF]', int_as_float=True, float_type=demjson.NUMBER_DECIMAL)],
                              [decimal.Decimal, decimal.Decimal, decimal.Decimal, decimal.Decimal] )
 
@@ -583,6 +583,14 @@ class DemjsonTest(unittest.TestCase):
         self.assertEqual(demjson.encode('\0', escape_unicode=True), r'"\u0000"')
         self.assertEqual(demjson.encode(u'\u00e0', escape_unicode=True), r'"\u00e0"')
         self.assertEqual(demjson.encode(u'\u2012', escape_unicode=True), r'"\u2012"')
+
+    def testHtmlSafe(self):
+        self.assertEqual(demjson.encode('<', html_safe=True), r'"\u003c"')
+        self.assertEqual(demjson.encode('>', html_safe=True), r'"\u003e"')
+        self.assertEqual(demjson.encode('&', html_safe=True), r'"\u0026"')
+        self.assertEqual(demjson.encode('/', html_safe=True), r'"\/"')
+        self.assertEqual(demjson.encode('a<b>c&d/e', html_safe=True), r'"a\u003cb\u003ec\u0026d\/e"')
+        self.assertEqual(demjson.encode('a<b>c&d/e', html_safe=False), r'"a<b>c&d/e"')
 
     def testDecodeStringExtendedUnicodeEscape(self):
         self.assertEqual(demjson.decode(r'"\u{0041}"',allow_extended_unicode_escapes=True), u'A')
@@ -1410,8 +1418,8 @@ class DemjsonTest(unittest.TestCase):
         self.assertEqual( self.decode_stats( '"abc"' ).total_string_length, 3 )
         self.assertEqual( self.decode_stats( r'"\u2020"' ).max_string_length, 1 )
         self.assertEqual( self.decode_stats( u'"\u2020"' ).max_string_length, 1 )
-        self.assertEqual( self.decode_stats( u'"\U0010ffff"' ).max_string_length, 1 )
-        self.assertEqual( self.decode_stats( r'"\ud804\udc88"' ).max_string_length, 1 )
+        self.assertEqual( self.decode_stats( u'"\U0010ffff"' ).max_string_length, (1 if is_wide_python else 2) )
+        self.assertEqual( self.decode_stats( r'"\ud804\udc88"' ).max_string_length, (1 if is_wide_python else 2) )
         self.assertEqual( self.decode_stats( '["","abc","defghi"]' ).max_string_length, 6 )
         self.assertEqual( self.decode_stats( '["","abc","defghi"]' ).total_string_length, 9 )
         self.assertEqual( self.decode_stats( '""' ).min_codepoint, None )
@@ -1426,8 +1434,8 @@ class DemjsonTest(unittest.TestCase):
         self.assertEqual( self.decode_stats( r'"\1"' ).max_codepoint, 1 )
         self.assertEqual( self.decode_stats( r'"\u0001"' ).min_codepoint, 1 )
         self.assertEqual( self.decode_stats( r'"\u0001"' ).max_codepoint, 1 )
-        self.assertEqual( self.decode_stats( r'"\ud804\udc88"' ).min_codepoint, 69768 )
-        self.assertEqual( self.decode_stats( r'"\ud804\udc88"' ).max_codepoint, 69768 )
+        self.assertEqual( self.decode_stats( r'"\ud804\udc88"' ).min_codepoint, (69768 if is_wide_python else 0xd804) )
+        self.assertEqual( self.decode_stats( r'"\ud804\udc88"' ).max_codepoint, (69768 if is_wide_python else 0xdc88) )
         self.assertEqual( self.decode_stats( r'"\u60ccABC\u0001"' ).min_codepoint, 1 )
         self.assertEqual( self.decode_stats( r'"\u60ccABC\u0001"' ).max_codepoint, 0x60cc )
         self.assertEqual( self.decode_stats( r'"\377"' ).min_codepoint, 255 )
@@ -1438,8 +1446,8 @@ class DemjsonTest(unittest.TestCase):
         self.assertEqual( self.decode_stats( u'"\uffff"' ).max_codepoint, 0xffff )
         self.assertEqual( self.decode_stats( '["mnoapj","kzcde"]' ).min_codepoint, ord('a') )
         self.assertEqual( self.decode_stats( '["mnoapj","kzcde"]' ).max_codepoint, ord('z') )
-        self.assertEqual( self.decode_stats( u'"\U0010ffff"' ).min_codepoint, 0x10ffff )
-        self.assertEqual( self.decode_stats( u'"\U0010ffff"' ).max_codepoint, 0x10ffff )
+        self.assertEqual( self.decode_stats( u'"\U0010ffff"' ).min_codepoint, (0x10ffff if is_wide_python else 0xdbff) )
+        self.assertEqual( self.decode_stats( u'"\U0010ffff"' ).max_codepoint, (0x10ffff if is_wide_python else 0xdfff) )
 
     def testStatsComments(self):
         self.assertEqual( self.decode_stats( 'true' ).num_comments, 0 )

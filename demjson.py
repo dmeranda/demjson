@@ -120,9 +120,9 @@ r""" A JSON data encoder and decoder.
 __author__ = "Deron Meranda <http://deron.meranda.us/>"
 __homepage__ = "http://deron.meranda.us/python/demjson/"
 
-__date__ = "2014-06-20"
-__version__ = "2.2"
-__version_info__ = ( 2, 2, 0 )    # Will be converted into a namedtuple below
+__date__ = "2014-06-24"
+__version__ = "2.2.1"
+__version_info__ = ( 2, 2, 1 )    # Will be converted into a namedtuple below
 
 __credits__ = """Copyright (c) 2006-2014 Deron E. Meranda <http://deron.meranda.us/>
 
@@ -2875,11 +2875,20 @@ class json_options(object):
         ) # end behavior list
 
     def reset_to_defaults(self):
+        # Plain attrs (other than above behaviors) are simply copied
+        # by value, either during initialization (via keyword
+        # arguments) or via the copy() method.
         self._plain_attrs = ['leading_zero_radix',
                              'encode_namedtuple_as_object',
                              'encode_enum_as',
                              'encode_compactly',
                              'escape_unicode',
+                             'always_escape_chars',
+                             'warn_string_length',
+                             'warn_max_depth',
+                             'int_as_float',
+                             'decimal_context',
+                             'float_type',
                              'keep_format',
                              'date_format',
                              'datetime_format',
@@ -2903,6 +2912,7 @@ class json_options(object):
         self._encode_enum_as = 'name'  # via property
         self.encode_compactly = True
         self.escape_unicode = False
+        self.always_escape_chars = None  # None, or a set of Unicode characters to always escape
 
         self.warn_string_length = 0xfffd   # with 16-bit length prefix
         self.warn_max_depth = 64
@@ -2953,15 +2963,25 @@ class json_options(object):
             self.strictness = kwargs['strict']
 
         for kw,val in kwargs.items():
-            if kw in self._plain_attrs:
-                setattr(self, kw, val)
-            elif kw == 'compactly': # alias for 'encode_compactly'
+            if kw == 'compactly': # alias for 'encode_compactly'
                 self.encode_compactly = val
             elif kw == 'strict':
                 pass   # Already handled
             elif kw == 'warnings':
                 if val:
                     self.suppress_warnings()
+            elif kw == 'html_safe' or kw == 'xml_safe':
+                if bool(val):
+                    if self.always_escape_chars is None:
+                        self.always_escape_chars = set(u'<>/&')
+                    else:
+                        self.always_escape_chars.update( set(u'<>/&') )
+            elif kw == 'always_escape':
+                if val:
+                    if self.always_escape_chars is None:
+                        self.always_escape_chars = set(val)
+                    else:
+                        self.always_escape_chars.update( set(val) )
             elif kw == 'int_as_float':
                 self.int_as_float = bool(val)
             elif kw == 'keep_format':
@@ -3009,6 +3029,8 @@ class json_options(object):
                         self.set_behavior( behavior, WARN )
                     else:
                         self.set_behavior( behavior, ALLOW )
+            elif kw in self._plain_attrs:
+                setattr(self, kw, val)
             else:
                 raise ValueError("Unknown keyword argument %r to initialize %s" % (kw,self.__class__.__name__))
 
@@ -3027,7 +3049,14 @@ class json_options(object):
             self.set_behavior( name, other.get_behavior(name) )
 
         for name in self._plain_attrs:
-            setattr(self, name, getattr(other, name))
+            val = getattr(other,name)
+            if isinstance(val, set):
+                val = val.copy()
+            elif decimal and isinstance(val, decimal.Decimal):
+                val = val.copy()
+
+            setattr(self, name, val)
+
 
     def spaces_to_next_indent_level( self, min_spaces=1, subtract=0 ):
         n = self.indent_amount - subtract
@@ -3383,7 +3412,8 @@ class JSON(object):
                     '\r': '\\r',
                     '\f': '\\f',
                     '"': '\\"',
-                    '\\': '\\\\'}
+                    '\\': '\\\\' }
+    _optional_rev_escapes = { '/': '\\/' }  # only escaped if forced to do so
 
     json_syntax_characters = u"{}[]\"\\,:0123456789.-+abcdefghijklmnopqrstuvwxyz \t\n\r"
 
@@ -4326,7 +4356,9 @@ class JSON(object):
         chunks = []
         chunks.append('"')
         revesc = self._rev_escapes
+        optrevesc = self._optional_rev_escapes
         asciiencodable = self._asciiencodable
+        always_escape = state.options.always_escape_chars
         encunicode = state.escape_unicode_test
         i = 0
         imax = len(s)
@@ -4336,7 +4368,8 @@ class JSON(object):
             else:
                 c = s[i]
             cord = ord(c)
-            if cord < 256 and asciiencodable[cord] and isinstance(encunicode, bool):
+            if cord < 256 and asciiencodable[cord] and isinstance(encunicode, bool) \
+                    and not (always_escape and c in always_escape):
                 # Contiguous runs of plain old printable ASCII can be copied
                 # directly to the JSON output without worry (unless the user
                 # has supplied a custom is-encodable function).
@@ -4348,7 +4381,8 @@ class JSON(object):
                     else:
                         c = s[i]
                     cord = ord(c)
-                    if cord < 256 and asciiencodable[cord]:
+                    if cord < 256 and asciiencodable[cord] \
+                            and not (always_escape and c in always_escape):
                         i += 1
                     else:
                         break
@@ -4387,7 +4421,9 @@ class JSON(object):
                     raise JSONEncodeError('can not include or escape a Unicode surrogate character',cname)
             elif cord <= 0xFFFF:
                 # Other BMP Unicode character
-                if unicodedata.category( c ) in ['Cc','Cf','Zl','Zp']:
+                if always_escape and c in always_escape:
+                    doesc = True
+                elif unicodedata.category( c ) in ['Cc','Cf','Zl','Zp']:
                     doesc = True
                 elif callable(encunicode):
                     doesc = encunicode( c )
@@ -4395,13 +4431,18 @@ class JSON(object):
                     doesc = encunicode
 
                 if doesc:
-                    chunks.append(r'\u%04x' % cord)
+                    if optrevesc.has_key(c):
+                        chunks.append(optrevesc[c])
+                    else:
+                        chunks.append(r'\u%04x' % cord)
                 else:
                     chunks.append( c )
                 i += 1
             else: # ord(c) >= 0x10000
                 # Non-BMP Unicode
-                if unicodedata.category( c ) in ['Cc','Cf','Zl','Zp']:
+                if always_escape and c in always_escape:
+                    doesc = True
+                elif unicodedata.category( c ) in ['Cc','Cf','Zl','Zp']:
                     doesc = True
                 elif callable(encunicode):
                     doesc = encunicode( c )
@@ -4851,6 +4892,7 @@ class JSON(object):
                 state.push_exception( err )
             except Exception, err:   # Mainly here to catch maximum recursion depth exceeded
                 e2 = sys.exc_info()
+                raise
                 newerr = JSONDecodeError("An unexpected failure occured", severity='fatal', position=state.buf.position)
                 newerr.__cause__ = err
                 newerr.__traceback__ = e2[2]
@@ -5787,6 +5829,7 @@ REFORMATTING OPTIONS:
         Without this option the standard output is used.
 
  --[no-]keep-format   Try to preserve numeric radix, e.g., hex, octal, etc.
+ --html-safe          Escape characters that are not safe to embed in HTML/XML.
 
  --sort <kind>     How to sort object/dictionary keys, <kind> is one of:
 %(sort_options_help)s
@@ -6028,6 +6071,7 @@ MORE INFORMATION:
                                          'stats',
                                          'output',
                                          'strict','nonstrict','warn',
+                                         'html-safe','xml-safe',
                                          'encoding=',
                                          'input-encoding=','output-encoding=',
                                          'sort=',
@@ -6137,6 +6181,8 @@ the options --allow, --warn, or --forbid ; for example:
                 escape_unicode = False
             elif opt in ('--input-encoding'):
                 input_encoding = val
+            elif opt in ('--html-safe','--xml-safe'):
+                kwoptions['html_safe'] = True
             elif opt in ('--allow','--warn','--forbid'):
                 action = opt[2:]
                 if action in kwoptions:

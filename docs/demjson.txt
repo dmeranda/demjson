@@ -3134,10 +3134,10 @@ DATA
     WARN = 'warn'
     __author__ = 'Deron Meranda <http://deron.meranda.us/>'
     __credits__ = 'Copyright (c) 2006-2014 Deron E. Meranda <http:/.../lic...
-    __date__ = '2014-06-20'
+    __date__ = '2014-06-24'
     __homepage__ = 'http://deron.meranda.us/python/demjson/'
-    __version__ = '2.2'
-    __version_info__ = version_info(major=2, minor=2, micro=0)
+    __version__ = '2.2.1'
+    __version_info__ = version_info(major=2, minor=2, micro=1)
     content_type = 'application/json'
     file_ext = 'json'
     float_maxexp = 308
@@ -3150,14 +3150,14 @@ DATA
     sorting_methods = {'alpha': 'Sort strictly alphabetically', 'alpha_ci'...
     syntax_error = demjson.undefined
     undefined = demjson.undefined
-    version = '2.2'
-    version_info = version_info(major=2, minor=2, micro=0)
+    version = '2.2.1'
+    version_info = version_info(major=2, minor=2, micro=1)
 
 VERSION
-    2.2
+    2.2.1
 
 DATE
-    2014-06-20
+    2014-06-24
 
 AUTHOR
     Deron Meranda <http://deron.meranda.us/>

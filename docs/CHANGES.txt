@@ -1,6 +1,38 @@
 Change history for demjson python module.
 
 
+Version 2.2.1 released 2014-06-24
+=================================
+Minor changes.
+
+* HTML use: A new encoding option, 'html_safe', is available when
+  encoding to JSON to force any characters which are not considered to
+  be HTML-safe (or XML-safe) to be encoded.  This includes '<', '>',
+  '&', and '/' -- among other characters which are always escaped
+  regardless of this new option.  This is useful when application
+  attempt to embed JSON into HTML and are not prepared to do the
+  proper escaping.  For jsonlint use '--html-safe'.
+
+      $ echo '"h&quot;ello</script>world]]>" | jsonlint -f --html-safe
+      "h\u0026quot;ello\u003c\/script\u003eworld]]\u003e"
+
+  See also CVE-2009-4924 for a similar report in another JSON package
+  for needing a way to do HTML-safe escaping.
+  <http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2009-4924>
+
+* Bug fix: If you created an instance of the 'json_options' class to
+  store any options, and then attempted to make a copy with it's
+  copy() method, not all of the options stored within it were copied.
+  This bug is very unlikely to occur, but it was fixed regardless.
+
+* Tests: The included self-test scripts for demjson should now pass
+  all tests when running under a narrow-Unicode version of Python.
+
+  It should be noted that the statistics for strings (max length, max
+  codepoint, etc.)  may not be correct under a narrow-Unicode Python.
+  This is a known issue that is likely not to be fixed.
+
+
 Version 2.2 released 2014-06-20
 =================================
     [Note, version 2.1 was never released.]
