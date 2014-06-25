@@ -120,9 +120,9 @@ r""" A JSON data encoder and decoder.
 __author__ = "Deron Meranda <http://deron.meranda.us/>"
 __homepage__ = "http://deron.meranda.us/python/demjson/"
 
-__date__ = "2014-06-24"
-__version__ = "2.2.1"
-__version_info__ = ( 2, 2, 1 )    # Will be converted into a namedtuple below
+__date__ = "2014-06-25"
+__version__ = "2.2.2"
+__version_info__ = ( 2, 2, 2 )    # Will be converted into a namedtuple below
 
 __credits__ = """Copyright (c) 2006-2014 Deron E. Meranda <http://deron.meranda.us/>
 
@@ -5486,7 +5486,7 @@ class JSON(object):
 # ------------------------------
 
 def encode( obj, encoding=None, **kwargs ):
-    """Encodes a Python object into a JSON-encoded string.
+    r"""Encodes a Python object into a JSON-encoded string.
 
     * 'strict'    (Boolean, default False)
 
@@ -5791,7 +5791,7 @@ class jsonlint(object):
             return lint.main( sys.argv[1:] )
 
     """
-    _jsonlint_usage = """Usage: %(program_name)s [<options> ...] [--] inputfile.json ...
+    _jsonlint_usage = r"""Usage: %(program_name)s [<options> ...] [--] inputfile.json ...
 
 With no input filename, or "-", it will read from standard input.
 
@@ -5809,7 +5809,7 @@ STRICTNESS OPTIONS (WARNINGS AND ERRORS):
  -s | --strict     Be strict in what is considered conforming JSON
  -S | --nonstrict  Be tolerant in what is considered conforming JSON
 
- --allow=...      -\\
+ --allow=...      -\
  --warn=...         |-- These options let you pick specific behaviors.
  --forbid=...     -/      Use --help-behaviors for more
 

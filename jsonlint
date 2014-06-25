@@ -7,8 +7,8 @@ Requires demjson module.
 """
 __author__ = "Deron Meranda <http://deron.meranda.us/>"
 __homepage__ = "http://deron.meranda.us/python/demjson/"
-__date__ = "2014-06-24"
-__version__ = "2.2.1"
+__date__ = "2014-06-25"
+__version__ = "2.2.2"
 __credits__ = """Copyright (c) 2006-2014 Deron E. Meranda <http://deron.meranda.us/>
 
 Licensed under GNU LGPL (GNU Lesser General Public License) version 3.0

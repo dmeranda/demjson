@@ -229,10 +229,10 @@ class DemjsonTest(unittest.TestCase):
 
     """
     def testConstants(self):
-        self.failIf( not isinstance(demjson.nan, float), "Missing nan constant" )
-        self.failIf( not isinstance(demjson.inf, float), "Missing inf constant" )
-        self.failIf( not isinstance(demjson.neginf, float), "Missing neginf constant" )
-        self.failIf( not hasattr(demjson, 'undefined'), "Missing undefined constant" )
+        self.assertFalse( not isinstance(demjson.nan, float), "Missing nan constant" )
+        self.assertFalse( not isinstance(demjson.inf, float), "Missing inf constant" )
+        self.assertFalse( not isinstance(demjson.neginf, float), "Missing neginf constant" )
+        self.assertFalse( not hasattr(demjson, 'undefined'), "Missing undefined constant" )
 
     def testDecodeKeywords(self):
         self.assertEqual(demjson.decode('true'), True)
@@ -289,8 +289,8 @@ class DemjsonTest(unittest.TestCase):
         self.assertEqual(demjson.decode('0X0F1a7Cb', allow_hex_numbers=True), 0xF1A7CB)
         self.assertEqual(demjson.decode('0x0000000000000000000000000000000000123', allow_hex_numbers=True), 0x123)
         self.assertEqual(demjson.decode('0x000000000000000000000000000000000012300', allow_hex_numbers=True), 0x12300)
-        self.assert_( is_negzero(demjson.decode('-0x0', allow_hex_numbers=True)),
-                      "Decoding negative zero hex numbers should give -0.0" )
+        self.assertTrue( is_negzero(demjson.decode('-0x0', allow_hex_numbers=True)),
+                         "Decoding negative zero hex numbers should give -0.0" )
         self.assertEqual(demjson.decode('-0x1', allow_hex_numbers=True), -1)
         self.assertEqual(demjson.decode('-0x000Fc854ab', allow_hex_numbers=True), -0xFC854AB)
         self.assertRaises(demjson.JSONDecodeError, demjson.decode, '0x', allow_hex_numbers=True)
@@ -315,8 +315,8 @@ class DemjsonTest(unittest.TestCase):
         self.assertEqual(demjson.decode('00017', allow_leading_zeros=True, leading_zero_radix=8), 15)
         self.assertEqual(demjson.decode('-017', allow_leading_zeros=True, leading_zero_radix=8), -15)
         self.assertEqual(demjson.decode('00', allow_leading_zeros=True, leading_zero_radix=8), 0)
-        self.assert_( is_negzero(demjson.decode('-00', allow_leading_zeros=True, leading_zero_radix=8)),
-                     "Decoding negative zero octal number should give -0.0")
+        self.assertTrue( is_negzero(demjson.decode('-00', allow_leading_zeros=True, leading_zero_radix=8)),
+                         "Decoding negative zero octal number should give -0.0")
 
     def testDecodeNewOctalNumbers(self):
         self.assertEqual(demjson.decode('0o0'), 0)
@@ -331,8 +331,8 @@ class DemjsonTest(unittest.TestCase):
         self.assertEqual(demjson.decode('0O4036517'), 1064271)
         self.assertEqual(demjson.decode('0o000000000000000000000000000000000000000017'), 15)
         self.assertEqual(demjson.decode('0o00000000000000000000000000000000000000001700'), 960)
-        self.assert_( is_negzero(demjson.decode('-0o0')),
-                     "Decoding negative zero octal number should give -0.0")
+        self.assertTrue( is_negzero(demjson.decode('-0o0')),
+                         "Decoding negative zero octal number should give -0.0")
         self.assertRaises(demjson.JSONDecodeError, demjson.decode, '0o')
         self.assertRaises(demjson.JSONDecodeError, demjson.decode, '0oA')
         self.assertRaises(demjson.JSONDecodeError, demjson.decode, '0o-3')
@@ -352,8 +352,8 @@ class DemjsonTest(unittest.TestCase):
         self.assertEqual(demjson.decode('0B11010001101111100010101101011'), 439862635),
         self.assertEqual(demjson.decode('0b00000000000000000000000000000000000000001101'), 13)
         self.assertEqual(demjson.decode('0b0000000000000000000000000000000000000000110100'), 52)
-        self.assert_( is_negzero(demjson.decode('-0b0')),
-                     "Decoding negative zero binary number should give -0.0")
+        self.assertTrue( is_negzero(demjson.decode('-0b0')),
+                         "Decoding negative zero binary number should give -0.0")
         self.assertRaises(demjson.JSONDecodeError, demjson.decode, '0b')
         self.assertRaises(demjson.JSONDecodeError, demjson.decode, '0bA')
         self.assertRaises(demjson.JSONDecodeError, demjson.decode, '0b-1')
@@ -368,41 +368,41 @@ class DemjsonTest(unittest.TestCase):
         """
         self.assertEqual(demjson.decode('-0.0'), -0.0)
         self.assertEqual(demjson.decode('0.0'), 0.0)
-        self.assert_(demjson.decode('0.0') is not demjson.decode('-0.0'),
-                     'Numbers 0.0 and -0.0 are not distinct')
-        self.assert_(demjson.decode('0') is not demjson.decode('-0'),
-                     'Numbers 0 and -0 are not distinct')
+        self.assertTrue(demjson.decode('0.0') is not demjson.decode('-0.0'),
+                        'Numbers 0.0 and -0.0 are not distinct')
+        self.assertTrue(demjson.decode('0') is not demjson.decode('-0'),
+                        'Numbers 0 and -0 are not distinct')
 
     def testDecodeNaN(self):
         """Checks parsing of JavaScript NaN.
         """
         # Have to use is_nan(), since by definition nan != nan
-        self.assert_( isinstance(demjson.decode('NaN', allow_non_numbers=True), float) )
-        self.assert_( is_nan(demjson.decode('NaN', allow_non_numbers=True)) )
-        self.assert_( is_nan(demjson.decode('+NaN', allow_non_numbers=True)) )
-        self.assert_( is_nan(demjson.decode('-NaN', allow_non_numbers=True)) )
+        self.assertTrue( isinstance(demjson.decode('NaN', allow_non_numbers=True), float) )
+        self.assertTrue( is_nan(demjson.decode('NaN', allow_non_numbers=True)) )
+        self.assertTrue( is_nan(demjson.decode('+NaN', allow_non_numbers=True)) )
+        self.assertTrue( is_nan(demjson.decode('-NaN', allow_non_numbers=True)) )
         if decimal:
-            self.assert_( isinstance(demjson.decode('NaN', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL), decimal.Decimal) )
-            self.assert_( is_nan(demjson.decode('NaN', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL)) )
-            self.assert_( is_nan(demjson.decode('+NaN', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL)) )
-            self.assert_( is_nan(demjson.decode('-NaN', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL)) )
+            self.assertTrue( isinstance(demjson.decode('NaN', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL), decimal.Decimal) )
+            self.assertTrue( is_nan(demjson.decode('NaN', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL)) )
+            self.assertTrue( is_nan(demjson.decode('+NaN', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL)) )
+            self.assertTrue( is_nan(demjson.decode('-NaN', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL)) )
         self.assertRaises(demjson.JSONDecodeError, demjson.decode, 'NaN', allow_non_numbers=False)
 
     def testDecodeInfinite(self):
         """Checks parsing of JavaScript Infinite.
         """
         # Have to use is_nan(), since by definition nan != nan
-        self.assert_( isinstance(demjson.decode('Infinity', allow_non_numbers=True), float) )
-        self.assert_( is_infinity(demjson.decode('Infinity', allow_non_numbers=True)) )
-        self.assert_( is_infinity(demjson.decode('+Infinity', allow_non_numbers=True)) )
-        self.assert_( is_infinity(demjson.decode('-Infinity', allow_non_numbers=True)) )
-        self.assert_( demjson.decode('-Infinity', allow_non_numbers=True) < 0 )
+        self.assertTrue( isinstance(demjson.decode('Infinity', allow_non_numbers=True), float) )
+        self.assertTrue( is_infinity(demjson.decode('Infinity', allow_non_numbers=True)) )
+        self.assertTrue( is_infinity(demjson.decode('+Infinity', allow_non_numbers=True)) )
+        self.assertTrue( is_infinity(demjson.decode('-Infinity', allow_non_numbers=True)) )
+        self.assertTrue( demjson.decode('-Infinity', allow_non_numbers=True) < 0 )
         if decimal:
-            self.assert_( isinstance(demjson.decode('Infinity', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL), decimal.Decimal) )
-            self.assert_( is_infinity(demjson.decode('Infinity', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL)) )
-            self.assert_( is_infinity(demjson.decode('+Infinity', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL)) )
-            self.assert_( is_infinity(demjson.decode('-Infinity', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL)) )
-            self.assert_( demjson.decode('-Infinity', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL).is_signed() )
+            self.assertTrue( isinstance(demjson.decode('Infinity', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL), decimal.Decimal) )
+            self.assertTrue( is_infinity(demjson.decode('Infinity', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL)) )
+            self.assertTrue( is_infinity(demjson.decode('+Infinity', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL)) )
+            self.assertTrue( is_infinity(demjson.decode('-Infinity', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL)) )
+            self.assertTrue( demjson.decode('-Infinity', allow_non_numbers=True, float_type=demjson.NUMBER_DECIMAL).is_signed() )
         self.assertRaises(demjson.JSONDecodeError, demjson.decode, 'Infinity', allow_non_numbers=False)
 
     def assertMatchesRegex(self, value, pattern, msg=None):
@@ -461,14 +461,14 @@ class DemjsonTest(unittest.TestCase):
                      'Large integer not encoded properly')
 
     def testEncodeNegativeZero(self):
-        self.assert_(demjson.encode(-0.0) in ['-0','-0.0'],
-                     'Float -0.0 is not encoded as a negative zero')
+        self.assertTrue(demjson.encode(-0.0) in ['-0','-0.0'],
+                        'Float -0.0 is not encoded as a negative zero')
         if decimal:
-            self.assert_(demjson.encode( decimal.Decimal('-0') ) in ['-0','-0.0'],
-                         'Decimal -0 is not encoded as a negative zero')
+            self.assertTrue(demjson.encode( decimal.Decimal('-0') ) in ['-0','-0.0'],
+                            'Decimal -0 is not encoded as a negative zero')
 
     def testJsonInt(self):
-        self.assert_( isinstance( demjson.json_int(0), (int,long) ) )
+        self.assertTrue( isinstance( demjson.json_int(0), (int,long) ) )
         self.assertEqual(demjson.json_int(0), 0)
         self.assertEqual(demjson.json_int(555999), 555999)
         self.assertEqual(demjson.json_int(-555999), -555999)
@@ -698,9 +698,9 @@ class DemjsonTest(unittest.TestCase):
                          rawbytes([ 0,0,0,QT, 0,0,0,0xE0, 0,0,0,QT ]) )
         self.assertEqual(demjson.encode(u'\u00e0', escape_unicode=False, encoding='utf-32be'),
                          rawbytes([ 0,0,0,QT, 0,0,0,0xE0, 0,0,0,QT ]) )
-        self.assert_(demjson.encode(u'\u00e0', escape_unicode=False, encoding='ucs4')
-                     in [rawbytes([ 0,0,0xFE,0xFF, 0,0,0,QT, 0,0,0,0xE0, 0,0,0,QT ]),
-                         rawbytes([ 0xFF,0xFE,0,0, QT,0,0,0, 0xE0,0,0,0, QT,0,0,0 ]) ])
+        self.assertTrue(demjson.encode(u'\u00e0', escape_unicode=False, encoding='ucs4')
+                        in [rawbytes([ 0,0,0xFE,0xFF, 0,0,0,QT, 0,0,0,0xE0, 0,0,0,QT ]),
+                            rawbytes([ 0xFF,0xFE,0,0, QT,0,0,0, 0xE0,0,0,0, QT,0,0,0 ]) ])
 
     def testEncodeStringWithSpecials(self):
         # Make sure that certain characters are always \u-encoded even if the

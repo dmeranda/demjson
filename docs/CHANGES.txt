@@ -1,6 +1,28 @@
 Change history for demjson python module.
 
 
+Version 2.2.2 released 2014-06-25
+=================================
+This minor release only fixes installation issues in older Python 3
+environments (< 3.4).
+
+If you are using Python 2 or Python 3.4, then there is nothing new.
+Once installed, there were no other changes to the API or any aspect
+of demjson operation.
+
+* Workarounds for bugs in Python's '2to3' conversion tool in Python
+  versions prior to 3.3.3.  This was Python bug 18037:
+  <http://bugs.python.org/issue18037>
+
+* The setup.py will install correctly in Python 3 environments that do
+  not have the 'setuptools' module installed.  It can now make use of
+  the more limited 'distutils' module instead.
+
+* The unit tests will now work without generating DeprecationWarning
+  messages under certain Python 3 versions.
+
+
+
 Version 2.2.1 released 2014-06-24
 =================================
 Minor changes.
@@ -9,7 +31,7 @@ Minor changes.
   encoding to JSON to force any characters which are not considered to
   be HTML-safe (or XML-safe) to be encoded.  This includes '<', '>',
   '&', and '/' -- among other characters which are always escaped
-  regardless of this new option.  This is useful when application
+  regardless of this new option.  This is useful when applications
   attempt to embed JSON into HTML and are not prepared to do the
   proper escaping.  For jsonlint use '--html-safe'.
 

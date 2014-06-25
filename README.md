@@ -14,6 +14,12 @@ unnecessary whitespace.
 
 What's new
 ==========
+<b>Version 2.2.2</b> fixes installation problems with certain Python 3
+versions prior to Python 3.4.  No other changes.
+
+<b>Version 2.2.1</b> adds an enhancement for HTML safety, and a few
+obscure bug fixes.
+
 <b>Version 2.2</b> fixes compatibility with Python 2.6 and
 narrow-Unicode Pythons, fixes bugs with statistics, and adds many
 enhancements to the treatment of numbers and floating-point values.
