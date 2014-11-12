@@ -1385,7 +1385,7 @@ class DemjsonTest(unittest.TestCase):
         self.assertEqual( self.decode_stats( alljson ).num_ints_long, len(nxls) )
 
         n53s = [-9007199254740992,-9007199254740991, 9007199254740991,9007199254740992]# -9007199254740991..9007199254740991
-        self.assertEqual( self.decode_stats( repr(n53s) ).num_ints_53bit, 2 )
+        self.assertEqual( self.decode_stats( repr(n53s).replace('L','') ).num_ints_53bit, 2 )
 
     def testStatsFloats(self):
         self.assertEqual( self.decode_stats( 'true' ).num_floats, 0 )
