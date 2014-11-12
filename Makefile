@@ -6,7 +6,7 @@ PYTHON=python
 PYDOC=pydoc
 
 MODULE=demjson
-VERSION=2.2.2
+VERSION=2.2.3
 
 SOURCES = $(MODULE).py
 SETUP = setup.py

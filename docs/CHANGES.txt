@@ -1,5 +1,17 @@
 Change history for demjson python module.
 
+Version 2.2.3 released 2014-11-12
+=================================
+
+* Fix return value of "jsonlint" command.  It should return a
+  non-zero value when an error is reported.
+  GitHub Issue 12: https://github.com/dmeranda/demjson/issues/12
+
+* Fix unit test failure in 32-bit Python 2.x environment.  This bug
+  only affected the unit tests, and was not a problem in the code
+  demjson module.
+  GitHub Issue 13: https://github.com/dmeranda/demjson/issues/13
+
 
 Version 2.2.2 released 2014-06-25
 =================================
@@ -100,7 +112,7 @@ values.
   which wraps the 'decode()' function and which reads the JSON
   document from a file.  It will correctly open the file in binary
   mode and insure the file is closed.  All other options supported
-  by deocde() can be passed.
+  by decode() can be passed.
 
       data = decode_file( "sample.json", allow_comments=True )
 

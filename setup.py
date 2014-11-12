@@ -1,7 +1,7 @@
 # Python package setup script        -*- coding: utf-8 -*-
 
 name = 'demjson'
-version = '2.2.2'
+version = '2.2.3'
 
 import sys
 try:

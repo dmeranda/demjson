@@ -1,6 +1,7 @@
 News announcements regarding the demjson python module.
 See the file CHANGES.txt for more details.
 
+2014-11-12  Release 2.2.3, jsonlint return value bugfix, unit test fixes.
 2014-06-25  Release 2.2.2, Python 3 installation fixes.
 2014-06-24  Release 2.2.1, Minor bugfix and html-safe option.
 2014-06-20  Release 2.2, Python 2.6, narrow-Unicode support, number enhancements.

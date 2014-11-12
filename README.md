@@ -14,6 +14,10 @@ unnecessary whitespace.
 
 What's new
 ==========
+<b>Version 2.2.3</b> fixes incorrect return values from the "jsonlint"
+command.  Also fixes a minor problem with the included unit tests in
+certain Python versions.
+
 <b>Version 2.2.2</b> fixes installation problems with certain Python 3
 versions prior to Python 3.4.  No other changes.
 
