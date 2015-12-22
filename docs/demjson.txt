@@ -3133,11 +3133,11 @@ DATA
     STRICTNESS_WARN = 'warn'
     WARN = 'warn'
     __author__ = 'Deron Meranda <http://deron.meranda.us/>'
-    __credits__ = 'Copyright (c) 2006-2014 Deron E. Meranda <http:/.../lic...
-    __date__ = '2014-11-12'
+    __credits__ = 'Copyright (c) 2006-2015 Deron E. Meranda <http:/.../lic...
+    __date__ = '2015-12-22'
     __homepage__ = 'http://deron.meranda.us/python/demjson/'
-    __version__ = '2.2.3'
-    __version_info__ = version_info(major=2, minor=2, micro=3)
+    __version__ = '2.2.4'
+    __version_info__ = version_info(major=2, minor=2, micro=4)
     content_type = 'application/json'
     file_ext = 'json'
     float_maxexp = 308
@@ -3150,20 +3150,20 @@ DATA
     sorting_methods = {'alpha': 'Sort strictly alphabetically', 'alpha_ci'...
     syntax_error = demjson.undefined
     undefined = demjson.undefined
-    version = '2.2.3'
-    version_info = version_info(major=2, minor=2, micro=3)
+    version = '2.2.4'
+    version_info = version_info(major=2, minor=2, micro=4)
 
 VERSION
-    2.2.3
+    2.2.4
 
 DATE
-    2014-11-12
+    2015-12-22
 
 AUTHOR
     Deron Meranda <http://deron.meranda.us/>
 
 CREDITS
-    Copyright (c) 2006-2014 Deron E. Meranda <http://deron.meranda.us/>
+    Copyright (c) 2006-2015 Deron E. Meranda <http://deron.meranda.us/>
     
     Licensed under GNU LGPL (GNU Lesser General Public License) version 3.0
     or later.  See LICENSE.txt included with this software.

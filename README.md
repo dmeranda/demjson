@@ -14,6 +14,11 @@ unnecessary whitespace.
 
 What's new
 ==========
+
+<b>Version 2.2.4</b> fixes problem with jsonlint under Python 3 when
+trying to reformat JSON (-f or -F options) and writing the output to
+standard output.
+
 <b>Version 2.2.3</b> fixes incorrect return values from the "jsonlint"
 command.  Also fixes a minor problem with the included unit tests in
 certain Python versions.

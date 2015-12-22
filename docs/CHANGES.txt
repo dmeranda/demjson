@@ -1,5 +1,12 @@
 Change history for demjson python module.
 
+Version 2.2.4 released 2015-12-22
+=================================
+
+* Fix problem with jsonlint under Python 3 when trying to reformat
+  JSON (-f or -F options) and writing the output to standard output.
+
+
 Version 2.2.3 released 2014-11-12
 =================================
 

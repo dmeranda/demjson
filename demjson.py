@@ -120,11 +120,11 @@ r""" A JSON data encoder and decoder.
 __author__ = "Deron Meranda <http://deron.meranda.us/>"
 __homepage__ = "http://deron.meranda.us/python/demjson/"
 
-__date__ = "2014-11-12"
-__version__ = "2.2.3"
-__version_info__ = ( 2, 2, 3 )    # Will be converted into a namedtuple below
+__date__ = "2015-12-22"
+__version__ = "2.2.4"
+__version_info__ = ( 2, 2, 4 )    # Will be converted into a namedtuple below
 
-__credits__ = """Copyright (c) 2006-2014 Deron E. Meranda <http://deron.meranda.us/>
+__credits__ = """Copyright (c) 2006-2015 Deron E. Meranda <http://deron.meranda.us/>
 
 Licensed under GNU LGPL (GNU Lesser General Public License) version 3.0
 or later.  See LICENSE.txt included with this software.
@@ -6022,7 +6022,10 @@ MORE INFORMATION:
                     self.stderr.write('%s: %s\n' % (pfx, str(err)) )
                     success = False
             else:
-                self.stdout.write( reformatted )
+                if hasattr(sys.stdout,'buffer'):  # To write binary data rather than strings
+                    self.stdout.buffer.write( reformatted )
+                else:
+                    self.stdout.write( reformatted )
         elif success == self.SUCCESS_OK and verbose_fp:
             verbose_fp.write('%sok\n' % pfx)
         elif success == self.SUCCESS_WARNING and verbose_fp:
